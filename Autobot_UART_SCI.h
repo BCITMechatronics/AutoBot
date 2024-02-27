@@ -10,7 +10,7 @@
 #define RX_BUFFER_SIZE 100 // Define the maximum size of the receive buffer
 #include "driverlib.h"
 #include "device.h"
-void SCI_AInit();
+void Autobot_SCI_AInit();
 char SCI_TxString(uint32_t base,unsigned char *txString);
 char SCI_RxString(uint32_t base,char * rxString);
 

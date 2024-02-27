@@ -24,7 +24,7 @@
 * Function: SCIAInit
 
 ************************************************************************************/
-void SCI_AInit()
+void Autobot_SCI_AInit()
 {
     //
     // Configure PLL, disable WD, enable peripheral clocks.

@@ -12,9 +12,17 @@
 #include <Autobot_ADC.h>
 
 
+//// Globals
+////
+uint16_t adcAResults[RESULTS_BUFFER_SIZE];
+uint16_t resultsIndex;
+uint16_t loopCounter;
 
-
-void ADC_init()
+long map(long x, long in_min, long in_max, long out_min, long out_max)
+{
+  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+void Autobot_ADC_init()
 {
     // Initialize device clock and peripherals
      //
@@ -45,6 +53,14 @@ void ADC_init()
       //
       setupADCContinuous(ADCA_BASE, 0U);
 
+      //
+      // Initialize results buffer
+      //
+      for(resultsIndex = 0; resultsIndex < RESULTS_BUFFER_SIZE; resultsIndex++)
+      {
+          adcAResults[resultsIndex] = 0;
+      }
+      resultsIndex = 0;
 
 }
 //
@@ -70,7 +86,7 @@ void configureADC(uint32_t adcBase)
 #if(EX_ADC_RESOLUTION == 12)
     ADC_setMode(adcBase, ADC_RESOLUTION_12BIT, ADC_MODE_SINGLE_ENDED);
 #elif(EX_ADC_RESOLUTION == 16)
-    ADC_setMode(adcBase, ADC_RESOLUTION_16BIT, ADC_MODE_SINGLE_ENDED);
+    ADC_setMode(adcBase, ADC_RESOLUTION_16BIT, ADC_MODE_DIFFERENTIAL);
 #endif
 
     //
