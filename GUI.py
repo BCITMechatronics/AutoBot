@@ -29,7 +29,7 @@ D = 0x44
 E = 0x45
 N = 0x4E        
 
-Uart_Baud = 19200    
+Uart_Baud = 115200  
 txtBoxWid = 22
 stop_pressed = False
 
@@ -63,9 +63,12 @@ def __tensileTest():
         
 def __exportCSV():
     messagebox.showinfo("Information", "Export .CSV file")
-    file_path = filedialog.asksaveasfilename(defaulextension='.csv', filetypes=[("CSV files","*.csv")])
+    file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files","*.csv")])
     if file_path:
         df = pd.DataFrame(data)
+        df = df.transpose()
+        column_label = ["Strain","Stress, MPa"]
+        df.columns = column_label
         df.to_csv(file_path, index=False)
     
     
@@ -82,7 +85,7 @@ def __quit():
     
 def __update_plot(stopBtn):
     try:        
-        Cmd_Byte = ser.readline().decode().strip()    # Obtain Cmd_Byte struct.unpack()
+        Cmd_Byte = ser.readline()    # Obtain Cmd_Byte
         # Decode the obtained data
         # Look Up Table for decoding
         #|----------------------------------------------------------------|
@@ -95,7 +98,7 @@ def __update_plot(stopBtn):
         #
         if Cmd_Byte == A:    # data transmission command
             data_point = 0
-            strainFlag = True   # To indicate incoming strain or stress data6
+            strainFlag = True   # To indicate incoming strain or stress data
             while True:          
                 global data, stress, strain
                 data_point = ser.readline()    # Obtain serial data from TMS
@@ -119,7 +122,8 @@ def __update_plot(stopBtn):
                             strainFlag = False
                         else:
                             stress.append(E)
-                            strainFlag = True                
+                            strainFlag = True          
+                            
                 # Append decoded data into array
                 if strainFlag == True:
                     strainFlag = False
@@ -127,8 +131,7 @@ def __update_plot(stopBtn):
                 else:
                     strainFlag = True
                     stress.append(float(data_point))
-                
-                
+                                
                 
                 # Plot configuration
                 axTens.set_xlim(0, 1.1*strain.end)
