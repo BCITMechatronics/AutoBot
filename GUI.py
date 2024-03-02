@@ -6,21 +6,20 @@ This is a temporary script file.
 """
 
 import tkinter as tk
-from tkinter import messagebox
-from tkinter import filedialog
+from tkinter import messagebox, filedialog
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.backends.backend_pdf import PdfPages
 import serial
 import pandas as pd
-
+import RPi.GPIO as GPIO
+import time
 
 # control different testing host
 feature_flag = {
-    'ENABLE_UART_PCHOST' : False,   # set True if using PC to RPi
-    'ENABLE_UART_TMS': False,       # set True if using TMS to RPi
-    'TESTING_WITH_PC_ONLY': True    # set True if only testing with PC
+    'ENABLE_UART_TMS' : True,        # set True if using RPi to TMS
+    'TESTING_WITH_PC_ONLY': False    # set True if only testing with PC
     }
           
 A = 0x41
@@ -30,26 +29,46 @@ D = 0x44
 E = 0x45
 N = 0x4E        
 
+# GPIO pin configuration
+GPIO.setmode(GPIO.BCM)
+pin_motor = 23
+GPIO.setup(pin_motor,GPIO.OUT)
+GPIO.output(pin_motor,GPIO.LOW)
+GPIO.setwarnings(False)
+
 Uart_Baud = 115200  
 txtBoxWid = 22
 stop_pressed = False
 
+global strain,stress, data
+strain = np.array([])
+stress = np.array([])
+
 # Create serial port
-if feature_flag.get('ENABLE_UART_PCHOST', True):
-    ser = serial.Serial('COM5', Uart_Baud)       # used for PC testing
-elif feature_flag.get('ENABLE_UART_TMS', True):
-    ser = serial.Serial('/dev/ttyS0', Uart_Baud) # used for RPi testing
+if feature_flag.get('ENABLE_UART_TMS', True):
+    ser = serial.Serial('/dev/ttyAMA0', Uart_Baud, timeout=1) # used for RPi testing
+    if ser.is_open:
+        print("port connected")
 elif feature_flag.get('TESTING_WITH_PC_ONLY', True):
     # Figure data (sample diagram)
     stress = np.concatenate( (np.linspace(0,50,50),np.linspace(50,70,50)))
     strain = np.arange(len(stress))
     data = [strain,stress]
 
+def __fake_datainput():
+    fakeData = b"ABCIT_MECHATRONICS&ROBOTICS_PROGRAMEND"
+    ser.write(fakeData)
+    time.sleep(0.1)
 
 def __tensileTest():
-    messagebox.showinfo("Information", "Starting tensile testing")
+    print("Tensile test initiated")
+    GPIO.output(pin_motor,GPIO.HIGH)
+
+    __update_plot()   # start the motor as the same time start plot real-time plotting
+    # messagebox.showinfo("Information", "Starting tensile testing")
         
 def __exportCSV():
+    GPIO.output(pin_motor,GPIO.LOW)
     messagebox.showinfo("Information", "Export .CSV file")
     file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files","*.csv")])
     if file_path:
@@ -58,9 +77,9 @@ def __exportCSV():
         column_label = ["Strain","Stress, MPa"]
         df.columns = column_label
         df.to_csv(file_path, index=False)
-    
-    
+      
 def __exportPDF():
+    GPIO.output(pin_motor,GPIO.LOW)
     messagebox.showinfo("Information", "Export .PDF file")
     file_path = filedialog.asksaveasfilename(defaultextension=".pdf", filetypes=[("PDF files", "*.pdf")])
     if file_path:
@@ -68,12 +87,16 @@ def __exportPDF():
             testCanvas.figure.savefig(pdf, format='pdf')
     
 def __quit():
+    GPIO.output(pin_motor,GPIO.LOW)
     root.quit()
     root.destroy()
     
-def __update_plot(stopBtn):
+def __update_plot():
     try:        
-        Cmd_Byte = ser.readline()    # Obtain Cmd_Byte
+        __fake_datainput()
+        print("entered update plot")
+        Cmd_Byte = ser.read().decode()  # Obtain Cmd_Byte
+        print('command: ',Cmd_Byte)
         # Decode the obtained data
         # Look Up Table for decoding
         #|----------------------------------------------------------------|
@@ -84,86 +107,101 @@ def __update_plot(stopBtn):
         #|    C     |       1      |    Limit Switch engaged, sys stops   |
         #|  E+N+D   |       3      |   Ending Byte of data transmission   |
         #
-        if Cmd_Byte == A:    # data transmission command
+        
+        if Cmd_Byte == 'A':    # data transmission command
+
+            print("entered Cmd_Byte == A")
             data_point = 0
             strainFlag = True   # To indicate incoming strain or stress data
             while True:          
                 global data, stress, strain
-                data_point = ser.readline()    # Obtain serial data from TMS
-                
+                data_point = int.from_bytes(ser.read())    # Obtain serial data from TMS
+                print("Reading byte: ", data_point)
                 if data_point == E:
-                    data_point = ser.readline()
+                    print("accepted byte E\n")
+                    data_point = int.from_bytes(ser.read())
                     if data_point == N:
-                        data_point = ser.readline()                        
+                        print("accepted byte N\n")
+                        data_point = int.from_bytes(ser.read())                     
                         if data_point == D:
+                            print("accepted byte D, breaking\n")
+                            __data_concat()
                             break
                         if strainFlag == True:
-                            strain.append(E)
-                            stress.append(N)
+                            strain = np.append(strain,np.array([E]))
+                            stress = np.append(stress,np.array([E]))
                         else:
-                            stress.append(E)
-                            strain.append(N)                          
+                            stress = np.append(stress,np.array([E]))
+                            strain = np.append(strain,np.array([E]))                         
                     # Append decoded data into array
                     else:
                         if strainFlag == True:
-                            strain.append(E)
+                            strain = np.append(strain,np.array([E]))
                             strainFlag = False
                         else:
-                            stress.append(E)
+                            stress = np.append(stress,np.array([E]))
                             strainFlag = True          
                             
                 # Append decoded data into array
                 if strainFlag == True:
                     strainFlag = False
-                    strain.append(float(data_point))
+                    strain = np.append(strain,np.array([data_point]))
+                    axTens.set_xlim(0, 2*data_point)
                 else:
                     strainFlag = True
-                    stress.append(float(data_point))
-                                
-                
-                # Plot configuration
-                axTens.set_xlim(0, 1.1*strain.end)
-                axTens.set_ylim(0, 1.1*stress.end)
-                
+                    stress = np.append(stress,np.array([data_point]))
+                    axTens.set_ylim(0, 2*data_point)
+                    line.set_data(strain, stress)  
+                    testCanvas.draw()
+                    root.update()
+                            
+                print("strain: ",strain,"\nstress: ",stress)
                 # update plot
-                line.set_data(strain, stress)
-                testCanvas.draw()
-                root.update()
+
                 root.after(5)
                 
                 # stop updating diagram if user pressed stop button
                 if stop_pressed:
+                    __data_concat()
                     break
-             
+        
+        elif Cmd_Byte == B:  # Emergency Stop engaged
+            GPIO.output(pin_motor,GPIO.LOW) # stop the motor
+            __data_concat()
+            messagebox.showinfo("Warning","System stops due to e-stop engagement")
+        elif Cmd_Byte == C:  # Limit Switch engaged
+            GPIO.output(pin_motor,GPIO.LOW) # stop the motor
+            __data_concat()
+            messagebox.showinfo("Warning","System stops due to limit switch been triggered")
+        print("enter nothing\n")
     except KeyboardInterrupt:  # stop the drawing due to interrupt (design for limit switch as well user interrupt)
-        data = np.concatenate( (strain.reshape(1,-1), stress.reshape(1,-1)), axis=0)
+        print("Interrupt from keyboard\n")
         ser.close()
 
 def __stop_plot():
     global stop_pressed
     stop_pressed = True
+    GPIO.output(pin_motor,GPIO.LOW)  # stop the motor
     messagebox.showinfo("Information","Process has been stopped")
     
-
-# Tensile test figure
-figTens, axTens = plt.subplots()
-line, = axTens.plot(strain, stress, label='Data')
-axTens.set_title("Stress vs Strain")
-axTens.set_xlabel("Strain")
-axTens.set_ylabel("Stress, MPa")
-
+def __data_concat():
+    global data
+    # Organize data frame for exporting .csv
+    data = np.concatenate((strain.reshape(1,-1), stress.reshape(1,-1)), axis=0)
+    
+    
 
 root = tk.Tk()
 root.title("BCIT_AUTOBOT")
 
-SCREEN_WIDTH = root.winfo_screenwidth()
+SCREEN_WIDTH = root.winfo_screenwidth() - 200
 INPUT_FRAME_WIDTH = SCREEN_WIDTH * 250 / 800
 OUTPUT_FRAME_WIDTH = SCREEN_WIDTH * 250 / 800
 EXPORT_FRAME_WIDTH = SCREEN_WIDTH * 250 / 800
 QUIT_FRAME_WIDTH = SCREEN_WIDTH * 250 / 800
 CHART_FRAME_WIDTH = SCREEN_WIDTH * 550 / 800
 
-SCREEN_HEIGHT = root.winfo_screenheight() - 80
+SCREEN_HEIGHT = root.winfo_screenheight() - 800
 INPUT_FRAME_HEIGHT = SCREEN_HEIGHT * 150 / 500
 OUTPUT_FRAME_HEIGHT = SCREEN_HEIGHT * 150 / 500
 EXPORT_FRAME_HEIGHT = SCREEN_HEIGHT * 150 / 500
@@ -230,12 +268,15 @@ tk.Button(exportFrame, text="Export .pdf", command=__exportPDF, bg="white").plac
 tk.Button(quitFrame, text="Exit Program", command=__quit, bg='white').place(relwidth=0.7, relx=0.5, rely=0.5, anchor="center")
 
 ############################  CHART FRAME ##################################### 
-testCanvas = FigureCanvasTkAgg(figTens, chartFrame)
-testCanvas.draw()
-testCanvas.get_tk_widget().place(relx=0.5,rely=0.5,anchor='center',relwidth=0.95,relheight=0.95)
-# __update_plot()
+# Tensile test figure
+figTens, axTens = plt.subplots()
+line, = axTens.plot([], [], label='Data')
+axTens.set_title("Stress vs Strain")
+axTens.set_xlabel("Strain")
+axTens.set_ylabel("Stress, MPa")
 
-# Organize data frame for exporting .csv
-data = np.concatenate( (strain.reshape(1,-1), stress.reshape(1,-1)), axis=0)
-    
+testCanvas = FigureCanvasTkAgg(figTens, chartFrame)
+testCanvas.get_tk_widget().place(relx=0.5,rely=0.5,anchor='center',relwidth=0.95,relheight=0.95)
+
 root.mainloop()
+ser.close()
