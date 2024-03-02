@@ -20,6 +20,7 @@ import pandas as pd
 feature_flag = {
     'ENABLE_UART_PCHOST' : False,   # set True if using PC to RPi
     'ENABLE_UART_TMS': False,       # set True if using TMS to RPi
+    'TESTING_WITH_PC_ONLY': True    # set True if only testing with PC
     }
           
 A = 0x41
@@ -33,29 +34,16 @@ Uart_Baud = 115200
 txtBoxWid = 22
 stop_pressed = False
 
-INPUT_FRAME_WIDTH = 250
-OUTPUT_FRAME_WIDTH = 250
-EXPORT_FRAME_WIDTH = 250
-QUIT_FRAME_WIDTH = 250
-CHART_FRAME_WIDTH = 550
-
-INPUT_FRAME_HEIGHT = 150
-OUTPUT_FRAME_HEIGHT = 150
-EXPORT_FRAME_HEIGHT = 150
-QUIT_FRAME_HEIGHT = 50
-CHART_FRAME_HEIGHT = 500
-
-
 # Create serial port
 if feature_flag.get('ENABLE_UART_PCHOST', True):
     ser = serial.Serial('COM5', Uart_Baud)       # used for PC testing
-if feature_flag.get('ENABLE_UART_TMS', True):
+elif feature_flag.get('ENABLE_UART_TMS', True):
     ser = serial.Serial('/dev/ttyS0', Uart_Baud) # used for RPi testing
-
-# Figure data (sample diagram)
-stress = np.concatenate( (np.linspace(0,50,50),np.linspace(50,70,50)))
-strain = np.arange(len(stress))
-data = [strain,stress]
+elif feature_flag.get('TESTING_WITH_PC_ONLY', True):
+    # Figure data (sample diagram)
+    stress = np.concatenate( (np.linspace(0,50,50),np.linspace(50,70,50)))
+    strain = np.arange(len(stress))
+    data = [strain,stress]
 
 
 def __tensileTest():
@@ -157,8 +145,6 @@ def __stop_plot():
     messagebox.showinfo("Information","Process has been stopped")
     
 
-
-
 # Tensile test figure
 figTens, axTens = plt.subplots()
 line, = axTens.plot(strain, stress, label='Data')
@@ -169,7 +155,22 @@ axTens.set_ylabel("Stress, MPa")
 
 root = tk.Tk()
 root.title("BCIT_AUTOBOT")
-root.geometry("800x500+500+100")
+
+SCREEN_WIDTH = root.winfo_screenwidth()
+INPUT_FRAME_WIDTH = SCREEN_WIDTH * 250 / 800
+OUTPUT_FRAME_WIDTH = SCREEN_WIDTH * 250 / 800
+EXPORT_FRAME_WIDTH = SCREEN_WIDTH * 250 / 800
+QUIT_FRAME_WIDTH = SCREEN_WIDTH * 250 / 800
+CHART_FRAME_WIDTH = SCREEN_WIDTH * 550 / 800
+
+SCREEN_HEIGHT = root.winfo_screenheight() - 80
+INPUT_FRAME_HEIGHT = SCREEN_HEIGHT * 150 / 500
+OUTPUT_FRAME_HEIGHT = SCREEN_HEIGHT * 150 / 500
+EXPORT_FRAME_HEIGHT = SCREEN_HEIGHT * 150 / 500
+QUIT_FRAME_HEIGHT = SCREEN_HEIGHT * 50 / 500
+CHART_FRAME_HEIGHT = SCREEN_HEIGHT
+
+root.geometry(f"{SCREEN_WIDTH}x{SCREEN_HEIGHT}+0+0")
 
 ############################ FRAME SETUP ######################################  
 inputFrame = tk.Frame(root,width=INPUT_FRAME_WIDTH, height=INPUT_FRAME_HEIGHT, bg="blue")
