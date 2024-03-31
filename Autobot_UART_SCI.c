@@ -36,15 +36,14 @@ void Autobot_SCI_AInit()
     //
     Device_initGPIO();
 
-    //
-    // Configuration for the SCI Rx pin.
-    //
+//    //
+//    // Configuration for the SCI Rx pin.
+
     GPIO_setMasterCore(DEVICE_GPIO_PIN_SCIRXDA, GPIO_CORE_CPU1);
     GPIO_setPinConfig(DEVICE_GPIO_CFG_SCIRXDA);
     GPIO_setDirectionMode(DEVICE_GPIO_PIN_SCIRXDA, GPIO_DIR_MODE_IN);
     GPIO_setPadConfig(DEVICE_GPIO_PIN_SCIRXDA, GPIO_PIN_TYPE_STD);
     GPIO_setQualificationMode(DEVICE_GPIO_PIN_SCIRXDA, GPIO_QUAL_ASYNC);
-
     //
     // Configuration for the SCI Tx pin.
     //
@@ -54,7 +53,8 @@ void Autobot_SCI_AInit()
     GPIO_setPadConfig(DEVICE_GPIO_PIN_SCITXDA, GPIO_PIN_TYPE_STD);
     GPIO_setQualificationMode(DEVICE_GPIO_PIN_SCITXDA, GPIO_QUAL_ASYNC);
 
-    //
+
+
     // Initialize interrupt controller and vector table.
     //
     Interrupt_initModule();
@@ -68,7 +68,7 @@ void Autobot_SCI_AInit()
     //
     // Configure SCIA for echoback.
     //
-    SCI_setConfig(SCIA_BASE, DEVICE_LSPCLK_FREQ, 9600, (SCI_CONFIG_WLEN_8 |
+    SCI_setConfig(SCIA_BASE, DEVICE_LSPCLK_FREQ, 115200, (SCI_CONFIG_WLEN_8 |
                                                         SCI_CONFIG_STOP_ONE |
                                                         SCI_CONFIG_PAR_NONE));
     SCI_resetChannels(SCIA_BASE);
@@ -142,15 +142,13 @@ char SCI_RxString(uint32_t base,char * rxString)
         {
             // End-of-line character received, end data reception
             rxString[index] = '\0'; // Append null terminator '\0' to the end of rxString array
-            break;
+            return 0;
         }
-
         // Store the received character in rxString at index position
         rxString[index] = receivedChar;
 
         // Move to the next position in the rxString array
         index++;
-
         // Check if exceeding the size of the rxString array
         if (index >= RX_BUFFER_SIZE)
         {

@@ -37,23 +37,23 @@ extern epwmInfo epwm2Info;
 extern epwmInfo epwm3Info;
 // Defines
 //
-#define EPWM1_TIMER_TBPRD  2000  // Period register
+#define EPWM1_TIMER_TBPRD  2000-1  // Period register
 #define EPWM1_MAX_CMPA     1950
 #define EPWM1_MIN_CMPA     50 //50 before
 #define EPWM1_MAX_CMPB     1950
 #define EPWM1_MIN_CMPB       50
 
-#define EPWM2_TIMER_TBPRD  2000  // Period register
-#define EPWM2_MAX_CMPA     1950
-#define EPWM2_MIN_CMPA       50
-#define EPWM2_MAX_CMPB     1950
-#define EPWM2_MIN_CMPB       50
-
-#define EPWM3_TIMER_TBPRD  2000  // Period register
-#define EPWM3_MAX_CMPA      950
-#define EPWM3_MIN_CMPA       50
-#define EPWM3_MAX_CMPB     1950
-#define EPWM3_MIN_CMPB     1050
+//#define EPWM2_TIMER_TBPRD  2000  // Period register
+//#define EPWM2_MAX_CMPA     1950
+//#define EPWM2_MIN_CMPA       50
+//#define EPWM2_MAX_CMPB     1950
+//#define EPWM2_MIN_CMPB       50
+//
+//#define EPWM3_TIMER_TBPRD  2000  // Period register
+//#define EPWM3_MAX_CMPA      950
+//#define EPWM3_MIN_CMPA       50
+//#define EPWM3_MAX_CMPB     1950
+//#define EPWM3_MIN_CMPB     1050
 
 #define EPWM_CMP_UP           1
 #define EPWM_CMP_DOWN         0
