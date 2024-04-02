@@ -11,7 +11,20 @@
 #include <Autobot_UART_SCI.h>
 #include "driverlib.h"
 #include "device.h"
-
+#include <Autobot_ADC.h>
+#include <board.h>
+#include <Autobot_EPWM.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <ctype.h>
+#include <stdbool.h>
+#include <float.h>
+#include <limits.h>
+#include <Autobot_Timer.h>
+#include <Autobot_MotorControl.h>
+#include <Autobot_Command.h>
 //
 // Defines
 //
@@ -132,6 +145,12 @@ char SCI_RxString(uint32_t base,char * rxString)
     uint16_t index = 0; // Index variable to store data into rxString
 
     // Loop to receive data from SCI port until encountering the '\r' character
+//    ///////////////////////////////////////////////////////////////////////////////////////
+//    //INTPUT PULLDOWN
+//    unsigned char LScheckUp=-1,LScheckDown=-1;
+////Not pull =1 when it hitt =0 for both UP and Down LS/
+//    unsigned char *msg;
+//    ///////////////////////////////////////////////////////////////////////////////////////
     while (1)
     {
         // Read a character from the SCI port

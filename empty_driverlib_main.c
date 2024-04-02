@@ -62,8 +62,8 @@ void main(void)
     EINT;  // Enable Global interrupt INTM
     ERTM;  // Enable Global realtime interrupt DBGM
 
-//    MotorDriver_setSpeed(20);
-////    MotorDriver_setDirection(MOVE_UP);
+    MotorDriver_setSpeed(40);
+    MotorDriver_setDirection(MOVE_UP);
 //    MotorDriver_setDirection(MOVE_DOWN);
 //    MotorDriver_setSpeed(50);
 //    MotorDriver_stop();
@@ -77,11 +77,6 @@ void main(void)
     char stress[6]={1,2,3,4,5,6};
     char strain[6]={1,2,3,4,5,6};
     char Message[16] = {'A', stress[1], strain[1], stress[2], strain[2], stress[3], strain[3], stress[4], strain[4], stress[5], strain[5], 'E', 'N', 'D'};
-//    while(1)
-//    {
-//        EPWM_setCounterCompareValue(myEPWM1_BASE, EPWM_COUNTER_COMPARE_A, 500);
-//        GPIO_writePin(IN_1,0);                            // DOWN
-//    }
     unsigned char test =-1;
     while(1)
     {

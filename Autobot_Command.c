@@ -88,19 +88,29 @@ void Autobot_Commands(char* command)
         GPIO_setDirectionMode(6, GPIO_DIR_MODE_IN);     // GPIO34 = input
         //INTPUT PULLDOWN
         unsigned char LScheckUp=-1,LScheckDown=-1;
-        LScheckUp =GPIO_readPin(7);
-        LScheckDown =GPIO_readPin(6);
-        char* msgLS;
-        if(LScheckUp==0)
+//Not pull =1 when it hitt =0 for both UP and Down LS
+        unsigned char *msg;
+        while(1)//LScheckUp==0 || LScheckDown==0LScheckUp==0 || LScheckDown==0
         {
-            msg = "Limit Swith UP it hitted!";
-            SCI_TxString(SCIA_BASE,msg);
+
+            LScheckUp =GPIO_readPin(7);
+            LScheckDown =GPIO_readPin(6);
+            if(LScheckUp==0)
+            {
+                  msg = "Limit Swith UP it hitted!";
+                  SCI_writeCharArray(SCIA_BASE, (uint16_t*)msg,25);
+                  MotorDriver_stop();
+                  MotorDriver_setDirection(MOVE_DOWN);
+            }
+            if(LScheckDown==0)
+            {
+                  msg = "Limit Swith Down it hitted!";
+                  SCI_writeCharArray(SCIA_BASE, (uint16_t*)msg,25);
+                  MotorDriver_stop();
+                  MotorDriver_setDirection(MOVE_UP);
+            }
         }
-        if(LScheckDown==0)
-        {
-            msg = "Limit Swith Down it hitted!";
-            SCI_TxString(SCIA_BASE,msg);
-        }
+
 
 
 

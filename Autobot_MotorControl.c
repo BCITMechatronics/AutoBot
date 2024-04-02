@@ -9,8 +9,11 @@
 #include <board.h>
 #include <Autobot_EPWM.h>
 #include <Autobot_MotorControl.h>
-
-
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <math.h>
 
 void Autobot_MotorDriver_int()
 {
@@ -37,9 +40,10 @@ void MotorDriver_setSpeed(unsigned char SpeedInPercent)
     //                                EPWM1_MIN_CMPA);
 //    EPWM_setCounterCompareValue(myEPWM1_BASE, EPWM_COUNTER_COMPARE_A,
 //                                    1000.5);
-    unsigned char SpeedInCCR=0;
-    SpeedInCCR= (2000*SpeedInPercent)/100;
-    EPWM_setCounterCompareValue(myEPWM1_BASE, EPWM_COUNTER_COMPARE_A, SpeedInCCR);
+//    unsigned char SpeedInCCR=0;
+//    SpeedInCCR= ((SpeedInPercent*2000)/100);
+    //check CMPA register inEpwm1Regs for make sure CCR1 value
+    EPWM_setCounterCompareValue(myEPWM1_BASE, EPWM_COUNTER_COMPARE_A, SpeedInPercent*20); //carefull with SpeedInPercent*20 its only good with CCR0=2000 SpeedInPercent*CCR0/100
 }
 void MotorDriver_setDirection(unsigned char Direction)
 {
