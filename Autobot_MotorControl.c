@@ -23,6 +23,14 @@ void Autobot_MotorDriver_int()
     GPIO_setPinConfig(GPIO_22_GPIO22);                // GPIO22 = GPIO22
     GPIO_setDirectionMode(IN_1, GPIO_DIR_MODE_OUT);    // GPIO22 = output
     GPIO_writePin(IN_1, 0);                            // Load output latch
+//    /////////////////// need comment
+//
+//    GPIO_setPadConfig(7, GPIO_PIN_TYPE_PULLUP);     // Enable pullup on GPIO34   GPIO_PIN_TYPE_PULLUP
+//    GPIO_setPinConfig(GPIO_7_GPIO7);               // GPIO34 = GPIO34
+//    GPIO_setDirectionMode(7, GPIO_DIR_MODE_IN);     // GPIO34 = input
+//    GPIO_setPadConfig(6, GPIO_PIN_TYPE_PULLUP);     // Enable pullup on GPIO34  GPIO_PIN_TYPE_STD
+//    GPIO_setPinConfig(GPIO_6_GPIO6);               // GPIO34 = GPIO34
+//    GPIO_setDirectionMode(6, GPIO_DIR_MODE_IN);     // GPIO34 = input
 
 
 

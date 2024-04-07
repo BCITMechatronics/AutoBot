@@ -22,7 +22,7 @@
 #include <stdbool.h>
 #include <float.h>
 #include <limits.h>
-#include <Autobot_Timer.h>
+
 #include <Autobot_MotorControl.h>
 #include <Autobot_Command.h>
 //

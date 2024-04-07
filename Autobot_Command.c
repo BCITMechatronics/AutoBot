@@ -19,7 +19,7 @@
 #include <stdbool.h>
 #include <float.h>
 #include <limits.h>
-#include <Autobot_Timer.h>
+
 #include <Autobot_MotorControl.h>
 #include <Autobot_Command.h>
 
@@ -80,12 +80,12 @@ void Autobot_Commands(char* command)
     }
     else if (strcmp(token, "LS") == 0)
     {
-        GPIO_setPadConfig(7, GPIO_PIN_TYPE_PULLUP);     // Enable pullup on GPIO34   GPIO_PIN_TYPE_PULLUP
-        GPIO_setPinConfig(GPIO_7_GPIO7);               // GPIO34 = GPIO34
-        GPIO_setDirectionMode(7, GPIO_DIR_MODE_IN);     // GPIO34 = input
-        GPIO_setPadConfig(6, GPIO_PIN_TYPE_PULLUP);     // Enable pullup on GPIO34  GPIO_PIN_TYPE_STD
-        GPIO_setPinConfig(GPIO_6_GPIO6);               // GPIO34 = GPIO34
-        GPIO_setDirectionMode(6, GPIO_DIR_MODE_IN);     // GPIO34 = input
+//        GPIO_setPadConfig(7, GPIO_PIN_TYPE_PULLUP);     // Enable pullup on GPIO34   GPIO_PIN_TYPE_PULLUP
+//        GPIO_setPinConfig(GPIO_7_GPIO7);               // GPIO34 = GPIO34
+//        GPIO_setDirectionMode(7, GPIO_DIR_MODE_IN);     // GPIO34 = input
+//        GPIO_setPadConfig(6, GPIO_PIN_TYPE_PULLUP);     // Enable pullup on GPIO34  GPIO_PIN_TYPE_STD
+//        GPIO_setPinConfig(GPIO_6_GPIO6);               // GPIO34 = GPIO34
+//        GPIO_setDirectionMode(6, GPIO_DIR_MODE_IN);     // GPIO34 = input
         //INTPUT PULLDOWN
         unsigned char LScheckUp=-1,LScheckDown=-1;
 //Not pull =1 when it hitt =0 for both UP and Down LS

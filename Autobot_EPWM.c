@@ -20,31 +20,31 @@ epwmInfo epwm3Info;
 void Autobot_EPWM_init()
 {
     //pwm
-        //
-        // Initialize device clock and peripherals
-        //
-        Device_init();
-
-        //
-        // Disable pin locks and enable internal pull-ups.
-        //
-        Device_initGPIO();
-
-        //
-        // Initialize PIE and clear PIE registers. Disables CPU interrupts.
-        //
-        Interrupt_initModule();
-
-        //
-        // Initialize the PIE vector table with pointers to the shell Interrupt
-        // Service Routines (ISR).
-        //
-        Interrupt_initVectorTable();
+//        //
+//        // Initialize device clock and peripherals
+//        //
+//        Device_init();
+//
+//        //
+//        // Disable pin locks and enable internal pull-ups.
+//        //
+//        Device_initGPIO();
+//
+//        //
+//        // Initialize PIE and clear PIE registers. Disables CPU interrupts.
+//        //
+//        Interrupt_initModule();
+//
+//        //
+//        // Initialize the PIE vector table with pointers to the shell Interrupt
+//        // Service Routines (ISR).
+//        //
+//        Interrupt_initVectorTable();
 
         //
         // For this case just init GPIO pins for ePWM1, ePWM2, ePWM3
         //
-        Board_init();
+//        Board_init();
 
         //
         // Interrupts that are used in this example are re-mapped to
@@ -77,9 +77,9 @@ void Autobot_EPWM_init()
 
         //
         // Enable global Interrupts and higher priority real-time debug events:
-        //
-        EINT;  // Enable Global interrupt INTM
-        ERTM;  // Enable Global realtime interrupt DBGM
+//        //
+//        EINT;  // Enable Global interrupt INTM
+//        ERTM;  // Enable Global realtime interrupt DBGM
 }
 //
 // initEPWM1 - Initialize EPWM1 values
