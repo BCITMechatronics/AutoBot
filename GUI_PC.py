@@ -60,9 +60,6 @@ class __Tensile_Tester_Application(ttk.Frame):
         super().__init__(master)
         self.master = master
 
-        self.strain = np.array([])
-        self.stress = np.array([])
-
         master.geometry(f"{SCREEN_WIDTH}x{SCREEN_HEIGHT}+0+0")
 
 #%%#########################  FRAME SETUP  ####################################
@@ -367,6 +364,7 @@ class __Tensile_Tester_Application(ttk.Frame):
                                     relheight=1)
 #%%#########################  Func Defn    ####################################
     def __tensileTest(self):
+        self.__fake_datainput()
 
         messagebox.showinfo("Information", "Starting tensile testing")  
         self.stop_pressed = False # reset software stop status 
@@ -379,7 +377,8 @@ class __Tensile_Tester_Application(ttk.Frame):
         messagebox.showinfo("Information", "Done tensile testing")
 
     def __clear_figure(self):
-        pass
+        self.figTens.legends = []
+        self.axTens.cla()
 
     def __get_shape(self,event):
         self.segShape = self.cbBox_typeSel.current()
@@ -427,13 +426,13 @@ class __Tensile_Tester_Application(ttk.Frame):
     def __fake_datainput(self):
         # self.fakeData = b"ABCIT_MECHATRONICS&ROBOTICS_PROGRAMEND"
         # ser.write(fakeData)
-        self.fakeData = "A112223243536374849596876988995END"
+        self.fakeData = "A112223243536374849596876988995"
 
         time.sleep(0.1)
     
     def __xq_cmd(self):
         try:        
-            self.__fake_datainput()
+            
             print("entered update plot")
            
             count = 0
@@ -462,132 +461,51 @@ class __Tensile_Tester_Application(ttk.Frame):
                 # GPIO.output(pin_motor,GPIO.LOW) # stop the motor
                 self.__data_concat()
                 messagebox.showinfo("Warning","System stops due to limit switch been triggered")
-            print("enter nothing\n")
-            # if Cmd_Byte == 'A':    # data transmission command
-    
-            #     print("entered Cmd_Byte == A")
-            #     data_point = 0
-            #     strainFlag = True   # To indicate incoming strain or stress data
-            #     while True:          
-            #         data_point = int.from_bytes(ser.read())    # Obtain serial data from TMS
-            #         print("Reading byte: ", data_point)
-            #         if data_point == E:
-            #             print("accepted byte E\n")
-            #             data_point = int.from_bytes(ser.read())
-            #             if data_point == N:
-            #                 print("accepted byte N\n")
-            #                 data_point = int.from_bytes(ser.read())                     
-            #                 if data_point == D:
-            #                     print("accepted byte D, breaking\n")
-            #                     self.__data_concat()
-            #                     break
-            #                 if strainFlag == True:
-            #                     strain = np.append(strain,np.array([E]))
-            #                     stress = np.append(stress,np.array([E]))
-            #                 else:
-            #                     stress = np.append(stress,np.array([E]))
-            #                     strain = np.append(strain,np.array([E]))                         
-            #             # Append decoded data into array
-            #             else:
-            #                 if strainFlag == True:
-            #                     strain = np.append(strain,np.array([E]))
-            #                     strainFlag = False
-            #                 else:
-            #                     stress = np.append(stress,np.array([E]))
-            #                     strainFlag = True          
-                                
-            #         # Append decoded data into array
-            #         if strainFlag == True:
-            #             strainFlag = False
-            #             strain = np.append(strain,np.array([data_point]))
-            #             axTens.set_xlim(0, 2*data_point)
-            #         else:
-            #             strainFlag = True
-            #             stress = np.append(stress,np.array([data_point]))
-            #             axTens.set_ylim(0, 2*data_point)
-            #             line.set_data(strain, stress)  
-            #             testCanvas.draw()
-            #             root.update()
-                                
-            #         print("strain: ",strain,"\nstress: ",stress)
-            #         # update plot
-    
-            #         root.after(5)
-                    
-            #         # stop updating diagram if user pressed stop button
-            #         if stop_pressed:
-            #             __data_concat()
-            #             break
+            else:
+                print("enter nothing\n")
             
-            # elif Cmd_Byte == 'B':  # Emergency Stop engaged
-            #     # GPIO.output(pin_motor,GPIO.LOW) # stop the motor
-            #     __data_concat()
-            #     messagebox.showinfo("Warning","System stops due to e-stop engagement")
-            # elif Cmd_Byte == 'C':  # Limit Switch engaged
-            #     # GPIO.output(pin_motor,GPIO.LOW) # stop the motor
-            #     __data_concat()
-            #     messagebox.showinfo("Warning","System stops due to limit switch been triggered")
-            # print("enter nothing\n")
         except KeyboardInterrupt:  # stop the drawing due to interrupt (design for limit switch as well user interrupt)
             print("Interrupt from keyboard\n")
             # ser.close()
     
     def __get_data(self):
+
+                self.strain=[]
+                self.stress=[]
                 self.line, = self.axTens.plot([], [], label='Current Test')
                 self.figTens.legend()
-                data_point = 0
-                count = 0
+                new_dataIn = 0
+                count = 1
+                data_point = 8
+                data_size = data_point * 2
                 print("entered Cmd_Byte == A")
                 strainFlag = True   # To indicate incoming strain or stress data
                 
-                while True:  
-                    count += 1        
-                    data_point = self.fakeData[count]    # Obtain serial data from TMS
-                    print("Reading byte: ", data_point)
-                    if data_point == 'E':
-                        print("accepted byte E\n")
-                        data_point = self.fakeData[count+1]
-                        if data_point == 'N':
-                            print("accepted byte N\n")
-                            data_point = self.fakeData[count+2]                     
-                            if data_point == 'D':
-                                print("accepted byte D, breaking\n")
-                                self.__data_concat()
-                                break
-                            if strainFlag == True:
-                                self.strain = np.append(self.strain,np.array([E]))
-                                self.stress = np.append(self.stress,np.array([E]))
-                            else:
-                                self.stress = np.append(self.stress,np.array([E]))
-                                self.strain = np.append(self.strain,np.array([E]))                         
-                        # Append decoded data into array
-                        else:
-                            if strainFlag == True:
-                                self.strain = np.append(self.strain,np.array([E]))
-                                strainFlag = False
-                            else:
-                                self.stress = np.append(self.stress,np.array([E]))
-                                strainFlag = True          
-                   
-                    data_point = int(data_point)
+                while (count<=data_size):          
+                    new_dataIn = self.fakeData[count]    # Obtain serial data from TMS
+                    print("Reading byte: ", new_dataIn)
+
+                    new_dataIn = int(new_dataIn)
                     # Append decoded data into array
                     if strainFlag == True:
                         strainFlag = False
-                        self.strain = np.append(self.strain,np.array([data_point]))
-                        self.axTens.set_xlim(0, 2*data_point)
+                        self.strain.append(new_dataIn)
+                        self.axTens.set_xlim(0, 2*new_dataIn)
                     else:
                         strainFlag = True
-                        self.stress = np.append(self.stress,np.array([data_point]))
-                        self.axTens.set_ylim(0, 2*data_point)
+                        self.stress.append(new_dataIn)
+                        self.axTens.set_ylim(0, 2*new_dataIn)
                         self.line.set_data(self.strain, self.stress)
                         self.testCanvas.draw()
                         root.update()
-                        root.after(5)
-                        # print("{},{}".format(self.stress,self.strain))
+                        
                     # stop updating diagram if user pressed stop button
                     if self.stop_pressed:
                         self.__data_concat()
                         break
+                    count += 1 
+                self.__data_concat()
+
                        
     def __stop_plot(self):
         self.stop_pressed = True
@@ -596,6 +514,8 @@ class __Tensile_Tester_Application(ttk.Frame):
         
     def __data_concat(self):
         # Organize data frame for exporting .csv
+        self.stress = np.array(self.stress)
+        self.strain = np.array(self.strain)
         self.data = np.concatenate(
             (self.strain.reshape(1,-1), self.stress.reshape(1,-1)), axis=0)
 
@@ -615,10 +535,11 @@ class __Tensile_Tester_Application(ttk.Frame):
         
         ts = str(timestamp)
         userID = "Mingqi"
-        csv_name = csv_id + "_" + ts + "_" + userID + ".csv"
-        self.csv_count += 1
+        
+        self.csv_name = csv_id + "_" + ts + "_" + userID 
+        backup_name = self.csv_name + ".csv"
 
-        file_path = self.backup_path / csv_name
+        file_path = self.backup_path / backup_name
         # file_path = self.backup_path / 'A0005_20240407031050_Mingqi.csv'
         if file_path:
             self.df = pd.DataFrame(self.data)
@@ -626,6 +547,8 @@ class __Tensile_Tester_Application(ttk.Frame):
             column_label = ["Strain","Stress, MPa"]
             self.df.columns = column_label
             self.df.to_csv(file_path, index=False)
+            self.file_names.append(self.csv_name)
+            self.csv_count += 1
 
             self.tableView.insert_row('end',[csv_id,backupDate,userID])
             self.tableView.load_table_data()     
