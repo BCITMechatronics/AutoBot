@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.backends.backend_pdf import PdfPages
-import serial
+import serial   
 import pandas as pd
 import RPi.GPIO as GPIO
 import time
