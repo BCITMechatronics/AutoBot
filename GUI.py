@@ -418,7 +418,7 @@ class __Tensile_Tester_Application(ttk.Frame):
     def __fake_datainput(self):
         # self.fakeData = b"ABCIT_MECHATRONICS&ROBOTICS_PROGRAMEND"
         # ser.write(fakeData)
-        self.fakeData = "A1122334455667788998877665544END"
+        self.fakeData = "A1122233435363738394847566879END"
 
         time.sleep(0.1)
     
