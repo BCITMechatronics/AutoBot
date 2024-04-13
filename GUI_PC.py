@@ -52,6 +52,10 @@ test_in_PC = True
 # if ser.is_open:
 #     print("port connected")
 
+# # Create serial port
+# ser = serial.Serial('COM8', Uart_Baud, timeout=1) # used for RPi testing
+# if ser.is_open:
+#     print("port connected")
 
 
 
