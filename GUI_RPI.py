@@ -19,12 +19,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.backends.backend_pdf import PdfPages
-import serial   
+import serial
 import pandas as pd
 import RPi.GPIO as GPIO
 import time
 from datetime import datetime
-import pathlib as Path
+import pathlib
+import os
    
 A = 0x41
 B = 0x42
@@ -35,28 +36,37 @@ N = 0x4E
 
 # GPIO pin configuration
 GPIO.setmode(GPIO.BCM)
-pin_motor = 23
+pin_segBreak = 1
+pin_motor = 18    # motor pin to inform TMS turn on (HIGH) or off (LOW) he motor
+pin_softStop = 23
+pin_hardStop = 24
 GPIO.setup(pin_motor,GPIO.OUT)
 GPIO.output(pin_motor,GPIO.LOW)
-GPIO.setwarnings(False)
 
-Uart_Baud = 115200  
+# Uart_Baud = 9600
+# Uart_Baud = 600
+# Uart_Baud = 4800  
+Uart_Baud = 19200
+# Uart_Baud = 115200 
+ 
 txtBoxHeight = 30
 btnHeight = 22
 stop_pressed = False
-global segWid, segLen, segRadius
-global strain,stress, data
-strain = np.array([])
-stress = np.array([])
-
 
 # Create serial port
-ser = serial.Serial('/dev/ttyAMA0', Uart_Baud, timeout=1) # used for RPi testing
-if ser.is_open:
-    print("port connected")
+try:
+    ser = serial.Serial(
+        port = '/dev/ttyAMA0', 
+        baudrate = Uart_Baud, 
+        parity=serial.PARITY_NONE,
+        stopbits=serial.STOPBITS_ONE,
+        bytesize=serial.EIGHTBITS,
+        timeout=1) # used for RPi testing
+    if ser.is_open:
+        print("port connected")
+except IOError:
+    print("Failed at setting port\n")
 
-# PATH = Path(__file__).parent / 'dataset'
-# print("dataset path is:", PATH)
 
 
 class __Tensile_Tester_Application(ttk.Frame):
@@ -64,8 +74,9 @@ class __Tensile_Tester_Application(ttk.Frame):
         super().__init__(master)
         self.master = master
 
-
         master.geometry(f"{SCREEN_WIDTH}x{SCREEN_HEIGHT}+0+0")
+        self.data_point =  13
+        ser.reset_input_buffer()
 
 #%%#########################  FRAME SETUP  ####################################
         inputFrame = ttk.Frame(
@@ -234,9 +245,9 @@ class __Tensile_Tester_Application(ttk.Frame):
             outputFrame, 
             text="Segment Area, mm^2",
             justify='center').place(
-                                            relx=0.5, 
-                                            relwidth=1, 
-                                            anchor="n")
+                                    relx=0.5, 
+                                    relwidth=1, 
+                                    anchor="n")
                 
         self.segArea = tk.DoubleVar()
         entry_Area = tk.Label(
@@ -285,27 +296,38 @@ class __Tensile_Tester_Application(ttk.Frame):
                             anchor="n", 
                             y=btnHeight*5)
 
-
-
 #%%#########################  HISTORYFRAME ####################################
+        self.backup_path =  pathlib.Path(__file__).parent / 'dataset'
         coldata = [
             {"text": "TEST_ID", "stretch": True},
             {"text": "DATE", "stretch": True},
             {"text": "TESTER", "stretch": True}
         ]
-
+        
         # rowdata = [
         #     ('A0001', '2024/04/06 22:52:43', 'Isaiah'),
         #     ('A0002', '2024/04/06 22:54:43', 'Andrew'),
         #     ('A0003', '2024/04/06 22:57:43', 'Edwin')
         # ]
 
-
+        self.file_names = []
+        self.rowdata = []
+        self.csv_count = 0
+        for file in os.listdir(self.backup_path):
+            if file.endswith(".csv"):
+                self.csv_count += 1
+                file = os.path.splitext(file)[0]
+                print("found files: ",file)
+                self.file_names.append(file)
+                file_info = file.split("_")
+                file_info[1] = datetime.fromtimestamp(int(file_info[1]))
+                self.rowdata.append((file_info[0],file_info[1],file_info[2]))
 
         self.tableView = Tableview(
                             historyFrame,
                             autofit=True,
                             coldata=coldata,
+                            rowdata=self.rowdata,
                             paginated=False,
                             searchable=True,
                             bootstyle='primary',
@@ -313,6 +335,9 @@ class __Tensile_Tester_Application(ttk.Frame):
                             delimiter=','
         )
         self.tableView.place(relwidth=1,relheight=1)
+
+        self.tv = self.tableView.view
+        self.tv.bind("<Double-1>", self.__plot_history)
 #%%#########################  Done FRAME   ####################################
         ttk.Button(
             doneFrame, 
@@ -342,7 +367,6 @@ class __Tensile_Tester_Application(ttk.Frame):
 #%%#########################  CHART FRAME  ####################################
         # Tensile test figure
         self.figTens, self.axTens = plt.subplots()
-        self.line, = self.axTens.plot([], [], label='Data')
         self.axTens.set_title("Stress vs Strain")
         self.axTens.set_xlabel("Strain")
         self.axTens.set_ylabel("Stress, MPa")
@@ -354,15 +378,36 @@ class __Tensile_Tester_Application(ttk.Frame):
                                     anchor='center',
                                     relwidth=1,
                                     relheight=1)
+    
+
+        
 #%%#########################  Func Defn    ####################################
     def __tensileTest(self):
-
+        # ser.flushInput()
+        # messagebox.showinfo("Information", "Starting tensile testing") 
+        self.strain=[]
+        self.stress=[]
+    
+        self.__fake_datainput()  
         print("Tensile test initiated")
-        GPIO.output(pin_motor,GPIO.HIGH)
-        self.__update_plot()   # start the motor as the same time start plot real-time plotting
-        messagebox.showinfo("Information", "Starting tensile testing")    
-        
- 
+        self.stop_pressed = False # reset software stop status 
+
+        GPIO.output(pin_motor,GPIO.HIGH)    # tell TMS turn on motor
+
+        self.__clear_figure()
+
+        while(ser.in_waiting > 0 ):
+            self.__xq_cmd() 
+
+        self.__backup_data()
+        messagebox.showinfo("Information", "Done tensile testing")
+
+        GPIO.output(pin_motor,GPIO.LOW)    # tell TMS turn off motor
+
+    def __clear_figure(self):
+        self.figTens.legends = []
+        self.axTens.cla()
+
     def __get_shape(self,event):
         self.segShape = self.cbBox_typeSel.current()
         if (self.segShape == 0): # rectangle shape
@@ -405,14 +450,161 @@ class __Tensile_Tester_Application(ttk.Frame):
         rounded_area = round(area,4)
         self.segArea.set(rounded_area)        
         messagebox.showinfo("Information", "Dimension updated!")
-
-        
+     
     def __fake_datainput(self):
-        fakeData = b"ABCIT_MECHATRONICS&ROBOTICS_PROGRAMEND"
-        ser.write(fakeData)
-        time.sleep(0.1)
+        self.fakeData = b"ABCIT_MECHATRONICS&ROBOTICS_PROGRAMEND"
+        ser.write(self.fakeData)
+        # self.fakeData = "A112223243536374849596876988995END"
 
+        time.sleep(0.1)
     
+    def __xq_cmd(self):  
+        try:         
+            print("entered __xq_cmd")   
+      
+            Cmd_Byte = (ser.read()) # Obtain Cmd_Byte
+            print('\ncommand: ', Cmd_Byte, ' type:', type(Cmd_Byte))
+            # print("decoded string:", Cmd_Byte.decode())
+            Cmd_Byte = int.from_bytes(Cmd_Byte)
+            print("int from byte: ", Cmd_Byte)
+            
+            # Cmd_Byte = self.fakeData[count]  # use in PC debug
+
+            # Decode the obtained data
+            # Look Up Table for decoding
+            #|----------------------------------------------------------------|
+            #| Cmd_Byte |   Byte Size  |              Command                 |
+            #|----------|--------------|--------------------------------------|
+            #|    A     |    1+vary    |  Encoder, LVDT data coming from TMS  |
+            #|    B     |       1      |   Emergency Stop engaged, sys stops  |
+            #|    C     |       1      |    Limit Switch engaged, sys stops   |
+            #
+            
+            if Cmd_Byte == A:    # data transmission command
+                self.__get_data()
+                return 1   
+            elif Cmd_Byte == B:  # Emergency Stop engaged
+                GPIO.output(pin_motor,GPIO.LOW) # stop the motor
+                self.__data_concat()
+                messagebox.showinfo("Warning","System stops due to e-stop engagement")
+                return 0
+                
+            elif Cmd_Byte == C:  # Limit Switch engaged
+                GPIO.output(pin_motor,GPIO.LOW) # stop the motor
+                self.__data_concat()
+                messagebox.showinfo("Warning","System stops due to limit switch been triggered")
+                return 0
+            else:
+                print("enter nothing\n")
+        except KeyboardInterrupt:
+            print("Interrupt from keyboard\n")
+            GPIO.output(pin_motor,GPIO.LOW)    # tell TMS turn off motor
+            ser.close()
+    
+    def __get_data(self):
+
+        self.line, = self.axTens.plot([], [], label='Current Test')
+        self.figTens.legend()
+        new_dataIn = 0        
+        count = 0
+        data_size = self.data_point * 2
+        print("entered Cmd_Byte == A")
+        strainFlag = True   # To indicate incoming strain or stress data
+
+
+        while count<data_size:        
+            new_dataIn = int.from_bytes(ser.read())    # Obtain serial data from TMS
+            print("Reading byte: ", new_dataIn)
+
+            # Append decoded data into array
+            if strainFlag == True:
+                strainFlag = False
+                self.strain.append(new_dataIn)
+                self.axTens.set_xlim(0, 2*new_dataIn)
+            else:
+                strainFlag = True
+                self.stress.append(new_dataIn)
+                self.axTens.set_ylim(0, 2*new_dataIn)
+                self.line.set_data(self.strain, self.stress)
+                self.testCanvas.draw()
+                root.update()
+
+            count += 1
+
+            # stop updating diagram if user pressed stop button
+            if self.stop_pressed:
+                self.__data_concat()
+                break
+          
+    def __stop_plot(self):
+        self.stop_pressed = True
+        GPIO.output(pin_motor,GPIO.LOW)  # stop the motor
+        messagebox.showinfo("Information","Process has been stopped")
+        
+    def __data_concat(self):
+        self.stress = np.array(self.stress)
+        self.strain = np.array(self.strain)
+        # Organize data frame for exporting .csv
+        self.data = np.concatenate(
+            (self.strain.reshape(1,-1), self.stress.reshape(1,-1)), axis=0)
+
+    def __backup_data(self):    
+        print("dataset path is:", self.backup_path)
+        dt_object = datetime.now()
+        timestamp = int(datetime.timestamp(dt_object))
+        backupDate = dt_object.strftime("%Y-%m-%d %H:%M:%S")
+        if (self.csv_count<10):
+                csv_id = "A000{}".format(self.csv_count)
+        elif (self.csv_count<100):
+            csv_id = "A00{}".format(self.csv_count)
+        elif (self.csv_count<1000):
+            csv_id = "A0{}".format(self.csv_count)
+        else:
+            csv_id = "A{}".format(self.csv_count)
+        
+        ts = str(timestamp)
+        userID = "Mingqi"
+        self.csv_name = csv_id + "_" + ts + "_" + userID 
+        backup_name = self.csv_name + ".csv"
+        
+
+        file_path = self.backup_path / backup_name
+        # file_path = self.backup_path / 'A0005_20240407031050_Mingqi.csv'
+        if file_path:
+            self.df = pd.DataFrame(self.data)
+            self.df = self.df.transpose()
+            column_label = ["Strain","Stress, MPa"]
+            self.df.columns = column_label
+            self.df.to_csv(file_path, index=False)
+            self.file_names.append(self.csv_name)
+            self.csv_count += 1
+
+            self.tableView.insert_row('end',[csv_id,backupDate,userID])
+            self.tableView.load_table_data()     
+
+    def __plot_history(self,event):
+        messagebox.showinfo("Information","entered plot history function")
+        selected_index = self.tv.index(self.tv.selection()[0])  # index from 0
+        history_file = self.file_names[selected_index] + ".csv"
+        print(selected_index)
+        history_path = pathlib.Path(__file__).parent / 'dataset' / history_file
+        history_data = self.__read_csv_file(history_path)
+
+        history_strain, history_stress = zip(*history_data)
+        print("strain: \n",history_strain)
+        print("stress: \n",history_stress)
+        selectLabel = "ID: " + history_file.split('_')[0]
+        self.axTens.plot(history_strain,history_stress, label=selectLabel)
+        self.figTens.legend()
+        self.testCanvas.draw()
+        root.update()
+
+    def __read_csv_file(self,filename):
+    # Read the CSV file into a DataFrame
+        df = pd.read_csv(filename)
+        # Convert the DataFrame to a list of lists
+        data = df.values.tolist()
+        return data   
         
     def __exportCSV(self):
         GPIO.output(pin_motor,GPIO.LOW)
@@ -421,11 +613,7 @@ class __Tensile_Tester_Application(ttk.Frame):
                                             defaultextension=".csv", 
                                             filetypes=[("CSV files","*.csv")])
         if file_path:
-            df = pd.DataFrame(data)
-            df = df.transpose()
-            column_label = ["Strain","Stress, MPa"]
-            df.columns = column_label
-            df.to_csv(file_path, index=False)
+            self.df.to_csv(file_path, index=False)
           
     def __exportPDF(self):
         GPIO.output(pin_motor,GPIO.LOW)
@@ -442,108 +630,12 @@ class __Tensile_Tester_Application(ttk.Frame):
         self.master.quit()
         self.master.destroy()
         
-    def __update_plot(self):
-        try:        
-            self.__fake_datainput()
-            print("entered update plot")
-            Cmd_Byte = ser.read().decode()  # Obtain Cmd_Byte
-            print('command: ',Cmd_Byte)
-            # Decode the obtained data
-            # Look Up Table for decoding
-            #|----------------------------------------------------------------|
-            #| Cmd_Byte |   Byte Size  |              Command                 |
-            #|----------|--------------|--------------------------------------|
-            #|    A     | 1+vary+E+N+D |  Encoder, LVDT data coming from TMS  |
-            #|    B     |       1      |   Emergency Stop engaged, sys stops  |
-            #|    C     |       1      |    Limit Switch engaged, sys stops   |
-            #|  E+N+D   |       3      |   Ending Byte of data transmission   |
-            #
-            
-            if Cmd_Byte == 'A':    # data transmission command
-    
-                print("entered Cmd_Byte == A")
-                data_point = 0
-                strainFlag = True   # To indicate incoming strain or stress data
-                while True:          
-                    global data, stress, strain
-                    data_point = int.from_bytes(ser.read())    # Obtain serial data from TMS
-                    print("Reading byte: ", data_point)
-                    if data_point == E:
-                        print("accepted byte E\n")
-                        data_point = int.from_bytes(ser.read())
-                        if data_point == N:
-                            print("accepted byte N\n")
-                            data_point = int.from_bytes(ser.read())                     
-                            if data_point == D:
-                                print("accepted byte D, breaking\n")
-                                self.__data_concat()
-                                break
-                            if strainFlag == True:
-                                strain = np.append(strain,np.array([E]))
-                                stress = np.append(stress,np.array([E]))
-                            else:
-                                stress = np.append(stress,np.array([E]))
-                                strain = np.append(strain,np.array([E]))                         
-                        # Append decoded data into array
-                        else:
-                            if strainFlag == True:
-                                strain = np.append(strain,np.array([E]))
-                                strainFlag = False
-                            else:
-                                stress = np.append(stress,np.array([E]))
-                                strainFlag = True          
-                                
-                    # Append decoded data into array
-                    if strainFlag == True:
-                        strainFlag = False
-                        strain = np.append(strain,np.array([data_point]))
-                        self.axTens.set_xlim(0, 2*data_point)
-                    else:
-                        strainFlag = True
-                        stress = np.append(stress,np.array([data_point]))
-                        self.axTens.set_ylim(0, 2*data_point)
-                        self.line.set_data(strain, stress)  
-                        self.testCanvas.draw()
-                        self.update()
-                                
-                    print("strain: ",strain,"\nstress: ",stress)
-                    # update plot
-    
-                    self.after(5)
-                    
-                    # stop updating diagram if user pressed stop button
-                    if stop_pressed:
-                        self.__data_concat()
-                        break
-            
-            elif Cmd_Byte == B:  # Emergency Stop engaged
-                # GPIO.output(pin_motor,GPIO.LOW) # stop the motor
-                self.__data_concat()
-                messagebox.showinfo("Warning","System stops due to e-stop engagement")
-            elif Cmd_Byte == C:  # Limit Switch engaged
-                # GPIO.output(pin_motor,GPIO.LOW) # stop the motor
-                self.__data_concat()
-                messagebox.showinfo("Warning","System stops due to limit switch been triggered")
-            print("enter nothing\n")
-        except KeyboardInterrupt:  # stop the drawing due to interrupt (design for limit switch as well user interrupt)
-            print("Interrupt from keyboard\n")
-            ser.close()
-    
-    def __stop_plot(self):
-        global stop_pressed
-        stop_pressed = True
-        # GPIO.output(pin_motor,GPIO.LOW)  # stop the motor
-        messagebox.showinfo("Information","Process has been stopped")
-        
-    def __data_concat(self):
-        global data
-        # Organize data frame for exporting .csv
-        data = np.concatenate(
-            (strain.reshape(1,-1), stress.reshape(1,-1)), axis=0)
-    
-    
+
+ 
+
 #%%#########################  Main Loop  ######################################
 root = ttkbs.Window('flatly')
+
 #%%#########################  Frame GEO    ####################################
 SCREEN_WIDTH = root.winfo_screenwidth()
 INPUT_FRAME_WIDTH = SCREEN_WIDTH * 250 / 800
@@ -577,4 +669,5 @@ app = __Tensile_Tester_Application(master = root)
 root.title("BCIT_AUTOBOT")
 
 root.mainloop()
+GPIO.cleanup()
 ser.close()
