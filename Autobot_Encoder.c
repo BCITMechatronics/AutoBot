@@ -16,21 +16,72 @@
 #include <limits.h>
 #include <stdint.h>
 #include <Autobot_Encoder.h>
+#include <Autobot_MotorControl.h>
 //GLOBAL
 volatile unsigned char encoderAPrevState = 0;
 volatile unsigned char encoderBPrevState = 0;
 
-volatile long long int EncoderCount = 0;
-volatile long long int prevEncoderCount = 0;
-volatile long long int DeltaCount[256];
-volatile long long int velocity = 0;
+volatile long int EncoderCount = 0;
+volatile long int prevEncoderCount = 0;
+volatile long int DeltaCount[256];
+volatile long int velocity = 0;
 volatile int indexCount=0;
-volatile long long int prevEncoderCountSpeed=0;
-volatile long long int Sample_Speed[500];
+volatile long int prevEncoderCountSpeed=0;
+volatile long int Sample_Speed[500];
+volatile unsigned char init_Count=2; // 0 ready for calibrate //1 is durring //2 is finish
+volatile unsigned char finish_Calibrate=0; //0 not finish/ 1 finish
+volatile long int Total_Of_Count=0;
 uint16_t cpuTimer0IntCount;
 uint16_t cpuTimer1IntCount;
 uint16_t cpuTimer2IntCount;
+//15      GPIO58      Encoder channel A
+//14      GPIO59      Encoder channel B
+//13      GPIO124     Encoder index channel M
+void Calibrate() // 1 day / Dont fking touching this fuction
+{
+    GPIO_disableInterrupt(GPIO_INT_XINT4);
+    GPIO_disableInterrupt(GPIO_INT_XINT5);
+    init_Count=0;
+    MotorDriver_setDirection(MOVE_UP);
+    MotorDriver_setSpeed(100);
+    unsigned char LScheckUp=1,LScheckDown=1;
+    DEVICE_DELAY_US(100000);
+    DEVICE_DELAY_US(100000);
+//Not pull =1 when it hitt =0 for both UP and Down LS
+    while(LScheckUp!=0)//LScheckUp==0 || LScheckDown==0LScheckUp==0 || LScheckDown==0
+    {
+        LScheckUp =GPIO_readPin(7);
+    }
+    MotorDriver_stop();
+    if(init_Count==0)
+    {
 
+        EncoderCount=0; //start Measure
+        MotorDriver_setDirection(MOVE_DOWN);
+        MotorDriver_setSpeed(100);
+        init_Count=1;
+    }
+    while(LScheckDown!=0)
+    {
+        LScheckDown =GPIO_readPin(6);
+    }
+    MotorDriver_stop();
+    if(init_Count==1)
+    {
+        Total_Of_Count=abs(EncoderCount)+60000;
+        EncoderCount=0;
+        MotorDriver_setDirection(MOVE_UP);
+        MotorDriver_setSpeed(50);
+        finish_Calibrate=1;
+        init_Count=2;
+    }
+    while(EncoderCount<=30000);
+    MotorDriver_stop();
+
+    EncoderCount=0;
+    GPIO_enableInterrupt(GPIO_INT_XINT4);         // Enable XINT1
+    GPIO_enableInterrupt(GPIO_INT_XINT5);         // Enable XINT2
+}
 void Autobot_Encoder_init()
 {
     Device_init();
@@ -53,8 +104,8 @@ void Autobot_Encoder_init()
     // Configure CPU-Timer 0, 1, and 2 to interrupt every second:
     // 1 second Period (in uSeconds)
     //
-    configCPUTimer(CPUTIMER0_BASE, DEVICE_SYSCLK_FREQ, 10000);
-    configCPUTimer(CPUTIMER1_BASE, DEVICE_SYSCLK_FREQ, 1000000);
+    configCPUTimer(CPUTIMER0_BASE, DEVICE_SYSCLK_FREQ, 1000000);
+    configCPUTimer(CPUTIMER1_BASE, DEVICE_SYSCLK_FREQ, 1000);
     configCPUTimer(CPUTIMER2_BASE, DEVICE_SYSCLK_FREQ, 1000000);
 
     //
@@ -106,22 +157,22 @@ void Autobot_Encoder_init()
     Interrupt_enable(INT_XINT5);
 
 
-    // GPIO19 and GPIO18 are inputs
+    // GPIO58 and GPIO59 are inputs
     //
 
-    //GPIO_setQualificationMode(18, GPIO_QUAL_SYNC);
-    GPIO_setPadConfig(19, GPIO_PIN_TYPE_STD);
-    GPIO_setPinConfig(GPIO_19_GPIO19);
-    GPIO_setPadConfig(18, GPIO_PIN_TYPE_STD);
-    GPIO_setPinConfig(GPIO_18_GPIO18);
-    GPIO_setPadConfig(67, GPIO_PIN_TYPE_STD);
-    GPIO_setPinConfig(GPIO_67_GPIO67);
-    GPIO_setDirectionMode(19,GPIO_DIR_MODE_IN);          // encoderAinput
-    GPIO_setDirectionMode(18,GPIO_DIR_MODE_IN);          // encoderBinput
-    GPIO_setDirectionMode(67,GPIO_DIR_MODE_IN);          // INDEX
-    GPIO_setInterruptPin(19,GPIO_INT_XINT1);///encoderA
-    GPIO_setInterruptPin(18,GPIO_INT_XINT2);//encoderB
-    GPIO_setInterruptPin(67,GPIO_INT_XINT3);//INDEX
+    //GPIO_setQualificationMode(59, GPIO_QUAL_SYNC);
+    GPIO_setPadConfig(58, GPIO_PIN_TYPE_STD);
+    GPIO_setPinConfig(GPIO_58_GPIO58);
+    GPIO_setPadConfig(59, GPIO_PIN_TYPE_STD);
+    GPIO_setPinConfig(GPIO_59_GPIO59);
+    GPIO_setPadConfig(124, GPIO_PIN_TYPE_STD);
+    GPIO_setPinConfig(GPIO_124_GPIO124);
+    GPIO_setDirectionMode(58,GPIO_DIR_MODE_IN);          // encoderAinput
+    GPIO_setDirectionMode(59,GPIO_DIR_MODE_IN);          // encoderBinput
+    GPIO_setDirectionMode(124,GPIO_DIR_MODE_IN);          // INDEX
+    GPIO_setInterruptPin(58,GPIO_INT_XINT1);///encoderA
+    GPIO_setInterruptPin(59,GPIO_INT_XINT2);//encoderB
+    GPIO_setInterruptPin(124,GPIO_INT_XINT3);//INDEX
     GPIO_setInterruptType(GPIO_INT_XINT1,GPIO_INT_TYPE_RISING_EDGE );
     GPIO_setInterruptType(GPIO_INT_XINT2,GPIO_INT_TYPE_RISING_EDGE  );//GPIO_INT_TYPE_FALLING_EDGE
     GPIO_setInterruptType(GPIO_INT_XINT3,GPIO_INT_TYPE_RISING_EDGE  );
@@ -156,11 +207,11 @@ void Autobot_Encoder_init()
 //
 //interrupt void xint1_isr(void) //ENCODER_A
 //{
-//    unsigned char inputB = GPIO_readPin(18);
+//    unsigned char inputB = GPIO_readPin(59);
 //    if(encoderAPrevState==0)// Check for rising edge (low-to-high) of ENCODER_A
 //    {
 //        // Check the state of ENCODER_B
-////        unsigned char inputB = GPIO_readPin(18);
+////        unsigned char inputB = GPIO_readPin(59);
 //        if (inputB==1)
 //        {
 //            EncoderCount++;
@@ -175,7 +226,7 @@ void Autobot_Encoder_init()
 //    else if(encoderAPrevState==1) // Falling edge (high-to-low) of ENCODER_A
 //    {
 //        // Check the state of ENCODER_B
-////        unsigned char inputB = GPIO_readPin(18);
+////        unsigned char inputB = GPIO_readPin(59);
 //        if (inputB==1)
 //        {
 //            EncoderCount--;
@@ -203,10 +254,10 @@ void Autobot_Encoder_init()
 ////
 //interrupt void xint2_isr(void)  //ENCODER_B
 //{
-//    unsigned char inputA = GPIO_readPin(19);
+//    unsigned char inputA = GPIO_readPin(58);
 //    if(encoderBPrevState==0)// Check for rising edge (low-to-high) of ENCODER_B
 //    {
-////        unsigned char inputA = GPIO_readPin(19);
+////        unsigned char inputA = GPIO_readPin(58);
 //        if (inputA==1)
 //        {
 //            EncoderCount--;
@@ -220,7 +271,7 @@ void Autobot_Encoder_init()
 //    }
 //    else if(encoderBPrevState==1)// Falling edge (high-to-low) of ENCODER_B
 //    {
-////        unsigned char inputA = GPIO_readPin(19);
+////        unsigned char inputA = GPIO_readPin(58);
 //        if (inputA==1)
 //        {
 //            EncoderCount++;
@@ -362,14 +413,14 @@ configCPUTimer(uint32_t cpuTimer, float freq, float period)
 //
 // cpuTimer1ISR - Counter for CpuTimer1
 //
-__interrupt void
-cpuTimer1ISR(void)
-{
-//    //
-//    // The CPU acknowledges the interrupt.
-//    //
-//    cpuTimer1IntCount++;
-}
+//__interrupt void
+//cpuTimer1ISR(void)
+//{
+////    //
+////    // The CPU acknowledges the interrupt.
+////    //
+////    cpuTimer1IntCount++;
+//}
 //
 ////
 //// cpuTimer2ISR - Counter for CpuTimer2

@@ -64,12 +64,14 @@ void MotorDriver_setDirection(unsigned char Direction)
     {
         GPIO_writePin(IN_1, 0);                            // Load output latch
     }
+    DEVICE_DELAY_US(10000);
 }
 
 void MotorDriver_stop()
 {
 
     EPWM_setCounterCompareValue(myEPWM1_BASE, EPWM_COUNTER_COMPARE_A, 0);
+    DEVICE_DELAY_US(10000);
 }
 
 

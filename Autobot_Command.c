@@ -7,7 +7,8 @@
 
 #include "driverlib.h"
 #include "device.h"
-#include <Autobot_UART_SCI.h>
+#include <Autobot_UART_SCIA.h>
+#include <Autobot_UART_SCIB.h>
 #include <Autobot_ADC.h>
 #include <board.h>
 #include <Autobot_EPWM.h>
@@ -73,6 +74,10 @@ void Autobot_Commands(char* command)
     else if (strcmp(token, "LVDT") == 0)
     {
         get_LVDT();
+    }
+    else if (strcmp(token, "CALIBRATE") == 0)
+    {
+        Calibrate();
     }
     else if (strcmp(token, "EncoderSpeed") == 0)
     {

@@ -33,13 +33,16 @@ interrupt void xint5_isr(void);
 //Global
 extern volatile unsigned char encoderAPrevState;
 extern volatile unsigned char encoderBPrevState;
-extern volatile long long int EncoderCount;
-extern volatile long long int prevEncoderCount;
-extern volatile long long int DeltaCount[256];
-extern volatile long long int velocity;
+extern volatile long int EncoderCount;
+extern volatile long int prevEncoderCount;
+extern volatile long int DeltaCount[256];
+extern volatile long int velocity;
 extern volatile int indexCount;
-extern volatile long long int prevEncoderCountSpeed;
-extern volatile long long int Sample_Speed[500];
+extern volatile long int prevEncoderCountSpeed;
+extern volatile long int Sample_Speed[500];
+extern volatile unsigned char init_Count; // 0 ready for calibrate //1 is durring //2 is finish
+extern volatile unsigned char finish_Calibrate; //0 not finish/ 1 finish
+extern volatile long int Total_Of_Count;
 ///Timer
 // Function Prototypes
 //
@@ -48,6 +51,7 @@ __interrupt void cpuTimer1ISR(void);
 __interrupt void cpuTimer2ISR(void);
 void initCPUTimers(void);
 void configCPUTimer(uint32_t, float, float);
+void Calibrate();
 //
 // Globals
 //

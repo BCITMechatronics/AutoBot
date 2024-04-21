@@ -11,7 +11,8 @@
 
 #include "driverlib.h"
 #include "device.h"
-#include <Autobot_UART_SCI.h>
+#include <Autobot_UART_SCIA.h>
+#include <Autobot_UART_SCIB.h>
 #include <Autobot_ADC.h>
 #include <board.h>
 #include <Autobot_EPWM.h>
