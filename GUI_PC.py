@@ -57,8 +57,8 @@ READ_SIZE = 4
 TEST_WITH_TMS = False
 
 ## MECH PROPERTY
-NM_PER_COUNT = 0.0936127527656      # lead screw moves per 1 encoder count
-COUNT_PER_NM = 10.6823052464        # count accumulation per 1 nm movement
+NM_PER_COUNT = 0.093612752      # lead screw moves per 1 encoder count
+COUNT_PER_NM = 10.68230524        # count accumulation per 1 nm movement
 MAX_COUNT = 6719170                 # default max count (not accurate, only used when user not want to calibrate)
 ADC_BIT = 16                        # ADC Bit size for differential mode
 ADC_N_MAX = 2**ADC_BIT              # number of steps for ADC
@@ -68,13 +68,13 @@ LOAD_CELL_CAP = 4900                # load cell capacity in kN
 if TEST_WITH_TMS:
     V_LSB_MV = 3300/ADC_N_MAX       # V_LSB in mV
     MM_PER_COUNT = NM_PER_COUNT / 10**6
-    LVDT_NEWTON_PER_MV = 2.034121432    # LVDT output voltage per Newton
+    LVDT_NEWTON_PER_MV = 2.03412143    # LVDT output voltage per Newton
     CRITICAL_FORCE = 0.9*LOAD_CELL_CAP  # 90% of maximum capacity of load cell
     HIGH_FORCE = 0.6*LOAD_CELL_CAP    # 60% of maximum capacity of load cell
 else:
     V_LSB_MV = 3300000/ADC_N_MAX    # V_LSB in mV    
     MM_PER_COUNT = NM_PER_COUNT
-    LVDT_NEWTON_PER_MV = 2.034121432    # LVDT output voltage per Newton
+    LVDT_NEWTON_PER_MV = 2.03412143    # LVDT output voltage per Newton
     CRITICAL_FORCE = 0.1*LOAD_CELL_CAP  # 90% of maximum capacity of load cell
     HIGH_FORCE = 0.05*LOAD_CELL_CAP    # 60% of maximum capacity of load cell
     
@@ -1052,9 +1052,6 @@ class __Tensile_Tester_Application(ttk.Frame):
             if strainFlag == False:
                 strainFlag = True
                 new_dataIn = new_dataIn*V_LSB_MV*LVDT_NEWTON_PER_MV     # force
-                if new_dataIn>self.ylim:
-                    self.ylim = new_dataIn
-                    self.axTens.set_ylim(0, 1.2*new_dataIn)
 
                 if new_dataIn > self.ultimateSt:
                     self.ultimateSt = new_dataIn
@@ -1067,6 +1064,9 @@ class __Tensile_Tester_Application(ttk.Frame):
                 self.__update_force(force)
                 new_dataIn = new_dataIn * self.inv_area     # stress
                 self.stress.append(new_dataIn)
+                if new_dataIn>self.ylim:
+                    self.ylim = new_dataIn
+                    self.axTens.set_ylim(0, 1.2*self.ylim)
 
             elif strainFlag == True:
                 strainFlag = False
@@ -1075,10 +1075,10 @@ class __Tensile_Tester_Application(ttk.Frame):
                 new_dataIn = new_dataIn * MM_PER_COUNT * self.inv_length
                 # print("delL: ",new_dataIn * MM_PER_COUNT)
                 self.strain.append(new_dataIn)
-                new_dataIn = round(new_dataIn,2)
+                # new_dataIn = round(new_dataIn,2)
                 if new_dataIn>self.xlim:                    
                     self.xlim = new_dataIn
-                    self.axTens.set_xlim(0, 1.2*new_dataIn)
+                    self.axTens.set_xlim(0, 1.2*self.xlim)
                 self.line.set_data(self.strain, self.stress)
                 self.testCanvas.draw()
                 self.master.update()
