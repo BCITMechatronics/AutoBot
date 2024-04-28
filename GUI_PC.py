@@ -60,16 +60,24 @@ TEST_WITH_TMS = False
 NM_PER_COUNT = 0.0936127527656      # lead screw moves per 1 encoder count
 COUNT_PER_NM = 10.6823052464        # count accumulation per 1 nm movement
 MAX_COUNT = 6719170                 # default max count (not accurate, only used when user not want to calibrate)
-LVDT_NEWTON_PER_MV = 2.034121432    # LVDT output voltage per Newton
 ADC_BIT = 16                        # ADC Bit size for differential mode
 ADC_N_MAX = 2**ADC_BIT              # number of steps for ADC
+
+LOAD_CELL_CAP = 4900                # load cell capacity in kN
 
 if TEST_WITH_TMS:
     V_LSB_MV = 3300/ADC_N_MAX       # V_LSB in mV
     MM_PER_COUNT = NM_PER_COUNT / 10**6
+    LVDT_NEWTON_PER_MV = 2.034121432    # LVDT output voltage per Newton
+    CRITICAL_FORCE = 0.9*LOAD_CELL_CAP  # 90% of maximum capacity of load cell
+    HIGH_FORCE = 0.6*LOAD_CELL_CAP    # 60% of maximum capacity of load cell
 else:
     V_LSB_MV = 3300000/ADC_N_MAX    # V_LSB in mV    
     MM_PER_COUNT = NM_PER_COUNT
+    LVDT_NEWTON_PER_MV = 2.034121432    # LVDT output voltage per Newton
+    CRITICAL_FORCE = 0.1*LOAD_CELL_CAP  # 90% of maximum capacity of load cell
+    HIGH_FORCE = 0.05*LOAD_CELL_CAP    # 60% of maximum capacity of load cell
+    
 
 if TEST_WITH_TMS:
     # Create serial ports
@@ -94,8 +102,8 @@ class __Tensile_Tester_Application(ttk.Frame):
         self.master = master
         self.login_userID = 'Jesus'
         self.test_flag = False
-        self.xlim = 0
-        self.ylim = 0
+        # self.xlim = 1
+        # self.ylim = 0
 
         self.needed_file = ['asset','user','dataset']
         self.__check_or_create_folder()
@@ -117,6 +125,10 @@ class __Tensile_Tester_Application(ttk.Frame):
         #     self.photoimages.append(ttkbs.PhotoImage(name=key, file=_path))
         
 #%%#########################  FUNCTION DEF  ####################################
+    # Purpose: to set up all widgets of the GUI
+    # 
+    # | Component | InputFrame | OutputFrame | HistoryFrame | DoneFrame | TuneFrame | ChartFrame | 
+    # |  Button   |      
     def __GUI_setup(self):
         
         inputFrame = ttk.Frame(
@@ -369,22 +381,22 @@ class __Tensile_Tester_Application(ttk.Frame):
                 anchor="n", 
                 y=btnHeight*3)
         
-        tk.Label(       # "Young's Modulus, GPa" label
-            outputFrame, 
-            text="Young's Modulus, GPa").place(
-                                            relx=0.5, 
-                                            relwidth=1, 
-                                            anchor="n",
-                                            y=btnHeight*4)
+        # tk.Label(       # "Young's Modulus, GPa" label
+        #     outputFrame, 
+        #     text="Young's Modulus, GPa").place(
+        #                                     relx=0.5, 
+        #                                     relwidth=1, 
+        #                                     anchor="n",
+        #                                     y=btnHeight*4)
                 
-        self.segYoung = tk.DoubleVar()
-        tk.Label(       # Young's Modulus value label
-                outputFrame, 
-                textvariable=self.segYoung).place(
-                relx=0.5, 
-                relwidth=1, 
-                anchor="n", 
-                y=btnHeight*5)
+        # self.segYoung = tk.DoubleVar()
+        # tk.Label(       # Young's Modulus value label
+        #         outputFrame, 
+        #         textvariable=self.segYoung).place(
+        #         relx=0.5, 
+        #         relwidth=1, 
+        #         anchor="n", 
+        #         y=btnHeight*5)
 
 #%%#########################  HISTORYFRAME ####################################
         self.backup_path =  pathlib.Path(__file__).parent / 'dataset'
@@ -482,13 +494,14 @@ class __Tensile_Tester_Application(ttk.Frame):
                         anchor='center')
         
         label_dir = {'  force indicator  ':SEPERATOR_TOP_RELY,
-                     '  position indicator  ':SEPERATOR_MID_RELY,
+                     '  position indicator  \n(drag to control)':SEPERATOR_MID_RELY,
                      '  speed selection  ':SEPERATOR_BOT_RELY}
         for key,val in label_dir.items():
             ttkbs.Label(
                 master=tuneFrame,
                 text=key,
-                style='inverse-dark'
+                style='inverse-dark',
+                justify='center'
             ).place(
                 relx=0.5,
                 rely=val,
@@ -622,11 +635,15 @@ class __Tensile_Tester_Application(ttk.Frame):
         )
 
         self.userVar = tk.StringVar()
-        ttk.Entry(
-            master=self.loginTop,
-            textvariable=self.userVar
-        ).pack(side='top',
-               pady=5)
+        entry_login = ttk.Entry(
+                master=self.loginTop,
+                textvariable=self.userVar,
+                
+            )
+        entry_login.pack(side='top',
+                pady=5)
+        entry_login.bind("<Return>",self.__get_user)
+        
         
         ttk.Button(
             master=self.loginTop,
@@ -670,6 +687,7 @@ class __Tensile_Tester_Application(ttk.Frame):
             while(ser.in_waiting):
                 if not self.__xq_cmd():
                     break    
+                ser.write("STOP")
         else:
             self.__fake_datainput() 
             while(True):
@@ -680,11 +698,11 @@ class __Tensile_Tester_Application(ttk.Frame):
         self.__data_concat()
         if len(self.data) != 0:    
             self.__backup_data()
+
         else:
             messagebox.showinfo("Information","Empty dataset")
         messagebox.showinfo("Information", "Done tensile testing")
         self.test_flag = False
-
 
 
 
@@ -805,6 +823,16 @@ class __Tensile_Tester_Application(ttk.Frame):
 
     def __update_force(self, fData):
         self.meter.amountusedvar.set(fData)
+        print("force is: ", fData)
+        print("Critical Force is: ", CRITICAL_FORCE)
+        print("Middle Force is: ", HIGH_FORCE)
+        if (fData>CRITICAL_FORCE):
+            self.meter.configure(bootstyle='danger')
+        elif (fData>HIGH_FORCE):
+            self.meter.configure(bootstyle='warning')
+        else:
+            self.meter.configure(bootstyle='dark')
+
 
 
 
@@ -820,7 +848,7 @@ class __Tensile_Tester_Application(ttk.Frame):
         self.testCanvas.draw()
         self.master.update()
 
-    def __get_user(self):
+    def __get_user(self,*event):
         self.login_userID = self.userVar.get()
         print("user ID is: " + self.login_userID)
         self.loginTop.destroy()
@@ -998,53 +1026,59 @@ class __Tensile_Tester_Application(ttk.Frame):
             ser.close()
     
     def __get_data(self):
+        self.xlim = 0
+        self.ylim = 0
         new_dataIn = 0
         data_size = NUM_DATA_POINT * 2
         count = 0
-        print("entered Cmd_Byte == A")
+        # print("entered Cmd_Byte == A")
         strainFlag = False   # To indicate incoming strain or stress data
+        self.axTens.set_xlim(0, 1)
 
         
         while count<data_size:    
             if TEST_WITH_TMS:    
                 new_dataIn = (ser.read(READ_SIZE))    # Obtain serial data from TMS
-                print("Reading byte: ", new_dataIn)
+                # print("Reading byte: ", new_dataIn)
                 new_dataIn = int.from_bytes(new_dataIn,byteorder='little')
-                print("Converting int: ", new_dataIn)
+                # print("Converting int: ", new_dataIn)
             else:
                 new_dataIn = int(self.fakeData[self.data_count])
-                print("Converting int: ", new_dataIn)
+                # print("Converting int: ", new_dataIn)
                 self.data_count += 1
             count += 1
 
             # Append decoded data into array
             if strainFlag == False:
                 strainFlag = True
-                new_dataIn = new_dataIn*V_LSB_MV*LVDT_NEWTON_PER_MV
+                new_dataIn = new_dataIn*V_LSB_MV*LVDT_NEWTON_PER_MV     # force
                 if new_dataIn>self.ylim:
-                    self.axTens.set_ylim(0, 2*new_dataIn)
+                    self.ylim = new_dataIn
+                    self.axTens.set_ylim(0, 1.2*new_dataIn)
 
                 if new_dataIn > self.ultimateSt:
                     self.ultimateSt = new_dataIn
                 elif new_dataIn < (self.ultimateSt * 0.05):     # 5% of ultimate Strength to determine breaks
-                    print("Ultimate Strength is: ", self.ultimateSt)
+                    # print("Ultimate Strength is: ", self.ultimateSt)
                     self.segUltSt.set(self.ultimateSt)
                     return 0
                 # print("appended stress: ", new_dataIn)
+                force = round(new_dataIn,2)
+                self.__update_force(force)
+                new_dataIn = new_dataIn * self.inv_area     # stress
                 self.stress.append(new_dataIn)
-                new_dataIn = round(new_dataIn,2)
-                self.__update_force(new_dataIn)
 
             elif strainFlag == True:
                 strainFlag = False
                 self.__update_pos(new_dataIn)
-                print("inv_length: ",self.inv_length)
+                # print("inv_length: ",self.inv_length)
                 new_dataIn = new_dataIn * MM_PER_COUNT * self.inv_length
-                print("delL: ",new_dataIn * MM_PER_COUNT)
+                # print("delL: ",new_dataIn * MM_PER_COUNT)
                 self.strain.append(new_dataIn)
                 new_dataIn = round(new_dataIn,2)
-                if new_dataIn>self.xlim:
-                    self.axTens.set_xlim(0, 2*new_dataIn)
+                if new_dataIn>self.xlim:                    
+                    self.xlim = new_dataIn
+                    self.axTens.set_xlim(0, 1.2*new_dataIn)
                 self.line.set_data(self.strain, self.stress)
                 self.testCanvas.draw()
                 self.master.update()
@@ -1054,7 +1088,8 @@ class __Tensile_Tester_Application(ttk.Frame):
             if self.stop_pressed:
                 self.__data_concat()
                 if TEST_WITH_TMS:
-                    ser.write("STOP")
+                    # ser.write("STOP")
+                    return 0
                 break
 
         return 1
