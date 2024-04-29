@@ -23,6 +23,7 @@
 #define IN_1 22
 #define IN_2 21
 #define PWM_DUTY_CYCLES 40
+void voidPositionControl(unsigned char PositionInPercent);
 void Autobot_MotorDriver_int();
 
 void MotorDriver_setDirection(unsigned char Direction);

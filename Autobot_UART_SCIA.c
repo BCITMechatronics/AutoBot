@@ -31,8 +31,10 @@
 // Define AUTOBAUD to use the autobaud lock feature
 //#define AUTOBAUD
 
-
-
+volatile char rxBuffer[RX_BUFFER_SIZE];
+volatile unsigned int rxIndex = 0; // Initialize rxIndex to 0
+volatile char receivedChar;
+volatile unsigned char rxString[BUFF_SZ];
 /************************************************************************************
 * Function: SCIAInit
 
@@ -76,22 +78,56 @@ void  Autobot_SCIA_init()
     //
     // Initialize SCIA and its FIFO.
     //
+//    SCI_performSoftwareReset(SCIA_BASE);
+    //
+    // Interrupts that are used in this example are re-mapped to
+    // ISR functions found within this file.
+    //
+    Interrupt_register(INT_SCIA_RX, sciaRXFIFOISR);
+//    Interrupt_register(INT_SCIA_TX, sciaTXFIFOISR);
     SCI_performSoftwareReset(SCIA_BASE);
-
-    //
-    // Configure SCIA for echoback.
-    //
     SCI_setConfig(SCIA_BASE, DEVICE_LSPCLK_FREQ, 115200, (SCI_CONFIG_WLEN_8 |
                                                         SCI_CONFIG_STOP_ONE |
                                                         SCI_CONFIG_PAR_NONE));
     SCI_resetChannels(SCIA_BASE);
-    SCI_resetRxFIFO(SCIA_BASE);
-    SCI_resetTxFIFO(SCIA_BASE);
-    SCI_clearInterruptStatus(SCIA_BASE, SCI_INT_TXFF | SCI_INT_RXFF);
-    SCI_enableFIFO(SCIA_BASE);
+    SCI_clearInterruptStatus(SCIA_BASE, SCI_INT_RXRDY_BRKDT);
+//    SCI_resetRxFIFO(SCIA_BASE);
+//    SCI_resetTxFIFO(SCIA_BASE);
+//    SCI_clearInterruptStatus(SCIA_BASE, SCI_INT_TXFF | SCI_INT_RXFF);
+//    SCI_enableFIFO(SCIA_BASE);
+//    SCI_enableModule(SCIA_BASE);
+//    SCI_performSoftwareReset(SCIA_BASE);
+//
+//    SCI_enableModule(SCIA_BASE);
+//    SCI_resetChannels(SCIA_BASE);
+//    SCI_enableFIFO(SCIA_BASE);
+//
+//    //
+//    // RX and TX FIFO Interrupts Enabled
+//    //
+//    SCI_enableInterrupt(SCIA_BASE, (SCI_INT_RXFF | SCI_INT_TXFF));
+//    SCI_disableInterrupt(SCIA_BASE, SCI_INT_RXERR);
+//
+//    SCI_setFIFOInterruptLevel(SCIA_BASE, SCI_FIFO_TX2, SCI_FIFO_RX2);
+//    SCI_performSoftwareReset(SCIA_BASE);
+//
+//    SCI_resetTxFIFO(SCIA_BASE);
+//    SCI_resetRxFIFO(SCIA_BASE);
     SCI_enableModule(SCIA_BASE);
+    SCI_resetChannels(SCIA_BASE);
+    SCI_enableFIFO(SCIA_BASE);
+    //
+    // RX and TX FIFO Interrupts Enabled
+    //
+    SCI_performSoftwareReset(SCIA_BASE);
+    SCI_enableInterrupt(SCIA_BASE, SCI_INT_RXRDY_BRKDT);//| SCI_INT_TXFF) SCI_INT_RXFF
+//    SCI_disableInterrupt(SCIA_BASE, SCI_INT_RXERR);
+
+//    SCI_setFIFOInterruptLevel(SCIA_BASE, SCI_FIFO_TX2, SCI_FIFO_RX1);
     SCI_performSoftwareReset(SCIA_BASE);
 
+    SCI_resetTxFIFO(SCIA_BASE);
+    SCI_resetRxFIFO(SCIA_BASE);
 #ifdef AUTOBAUD
     //
     // Perform an autobaud lock.
@@ -99,9 +135,36 @@ void  Autobot_SCIA_init()
     //
     SCI_lockAutobaud(SCIA_BASE);
 #endif
+    Interrupt_enable(INT_SCIA_RX);
+//    Interrupt_enable(INT_SCIA_TX);
+
+    Interrupt_clearACKGroup(INTERRUPT_ACK_GROUP9);
 }
 
+//
+// sciaTXFIFOISR - SCIA Transmit FIFO ISR
+//
+__interrupt void sciaTXFIFOISR(void)
+{
+//    uint16_t i;
+//
+//    SCI_writeCharArray(SCIA_BASE, sDataA, 2);
+//
+//    //
+//    // Increment send data for next cycle
+//    //
+//    for(i = 0; i < 2; i++)
+//    {
+//        sDataA[i] = (sDataA[i] + 1) & 0x00FF;
+//    }
 
+    SCI_clearInterruptStatus(SCIA_BASE, SCI_INT_TXFF);
+
+    //
+    // Issue PIE ACK
+    //
+    Interrupt_clearACKGroup(INTERRUPT_ACK_GROUP9);
+}
 
 
 /************************************************************************************

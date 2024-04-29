@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <math.h>
+#include <Autobot_Encoder.h>
 
 void Autobot_MotorDriver_int()
 {
@@ -58,20 +59,19 @@ void MotorDriver_setDirection(unsigned char Direction)
     if(Direction == MOVE_UP)
     {
         GPIO_writePin(IN_1, 1);                            // Load output latch
-
+        DirectionStatus =  MOVE_UP;
     }
     else if(Direction == MOVE_DOWN)
     {
         GPIO_writePin(IN_1, 0);                            // Load output latch
+        DirectionStatus =  MOVE_DOWN;
     }
-    DEVICE_DELAY_US(10000);
 }
 
 void MotorDriver_stop()
 {
 
     EPWM_setCounterCompareValue(myEPWM1_BASE, EPWM_COUNTER_COMPARE_A, 0);
-    DEVICE_DELAY_US(10000);
 }
 
 

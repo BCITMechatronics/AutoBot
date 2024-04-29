@@ -11,17 +11,17 @@
 #include "device.h"
 #include <Autobot_ADC.h>
 
-
 //// Globals
 ////
-uint16_t adcAResults[RESULTS_BUFFER_SIZE];
+//uint16_t adcAResult0;
+//uint16_t adcAResult1;
+uint16_t adcDResult0;
+uint16_t adcDResult1;
 uint16_t resultsIndex;
 uint16_t loopCounter;
+int16_t adcAResult0;
+int16_t adcAResult1;
 
-long map(long x, long in_min, long in_max, long out_min, long out_max)
-{
-  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
-}
 void Autobot_ADC_init()
 {
     // Initialize device clock and peripherals
@@ -46,27 +46,107 @@ void Autobot_ADC_init()
      //
       // Configure the ADC and power it up
       //
-      configureADC(ADCA_BASE);
+     //
+     // Set ADCDLK divider to /4
+     //
+     ADC_setPrescaler(ADCA_BASE, ADC_CLK_DIV_4_0);
+     ADC_setPrescaler(ADCD_BASE, ADC_CLK_DIV_4_0);
 
-      //
-      // Setup the ADC for continuous conversions on channel 0
-      //
-      setupADCContinuous(ADCA_BASE, 0U);
+     //
+     // Set resolution and signal mode (see #defines above) and load
+     // corresponding trims.
+     //
+ #if(EX_ADC_RESOLUTION == 12)
+     ADC_setMode(ADCA_BASE, ADC_RESOLUTION_12BIT, ADC_MODE_SINGLE_ENDED);
+     ADC_setMode(ADCD_BASE, ADC_RESOLUTION_12BIT, ADC_MODE_SINGLE_ENDED);
+ #elif(EX_ADC_RESOLUTION == 16)
+     ADC_setMode(ADCA_BASE, ADC_RESOLUTION_16BIT, ADC_MODE_DIFFERENTIAL);
+     ADC_setMode(ADCD_BASE, ADC_RESOLUTION_16BIT, ADC_MODE_DIFFERENTIAL);
+ #endif
 
-      //
-      // Initialize results buffer
-      //
-      for(resultsIndex = 0; resultsIndex < RESULTS_BUFFER_SIZE; resultsIndex++)
-      {
-          adcAResults[resultsIndex] = 0;
-      }
-      resultsIndex = 0;
+     //
+     // Set pulse positions to late
+     //
+     ADC_setInterruptPulseMode(ADCA_BASE, ADC_PULSE_END_OF_CONV);
+     ADC_setInterruptPulseMode(ADCD_BASE, ADC_PULSE_END_OF_CONV);
+
+     //
+     // Power up the ADCs and then delay for 1 ms
+     //
+     ADC_enableConverter(ADCA_BASE);
+     ADC_enableConverter(ADCD_BASE);
+
+     DEVICE_DELAY_US(1000);
+     //
+     // Configure SOCs of ADCA
+     // - SOC0 will convert pin A0.
+     // - SOC1 will convert pin A1.
+     // - Both will be triggered by software only.
+     // - For 12-bit resolution, a sampling window of 15 (75 ns at a 200MHz
+     //   SYSCLK rate) will be used.  For 16-bit resolution, a sampling window
+     //   of 64 (320 ns at a 200MHz SYSCLK rate) will be used.
+     // - NOTE: A longer sampling window will be required if the ADC driving
+     //   source is less than ideal (an ideal source would be a high bandwidth
+     //   op-amp with a small series resistance). See TI application report
+     //   SPRACT6 for guidance on ADC driver design.
+     //
+
+ #if(EX_ADC_RESOLUTION == 12)
+     ADC_setupSOC(ADCA_BASE, ADC_SOC_NUMBER0, ADC_TRIGGER_SW_ONLY,
+                  ADC_CH_ADCIN0, 15);
+     ADC_setupSOC(ADCA_BASE, ADC_SOC_NUMBER1, ADC_TRIGGER_SW_ONLY,
+                  ADC_CH_ADCIN1, 15);
+ #elif(EX_ADC_RESOLUTION == 16)
+     ADC_setupSOC(ADCA_BASE, ADC_SOC_NUMBER0, ADC_TRIGGER_SW_ONLY,
+                  ADC_CH_ADCIN0, 64);
+     ADC_setupSOC(ADCA_BASE, ADC_SOC_NUMBER1, ADC_TRIGGER_SW_ONLY,
+                  ADC_CH_ADCIN1, 64);
+ #endif
+
+     //
+     // Set SOC1 to set the interrupt 1 flag. Enable the interrupt and make
+     // sure its flag is cleared.
+     //
+     ADC_setInterruptSource(ADCA_BASE, ADC_INT_NUMBER1, ADC_SOC_NUMBER1);
+     ADC_enableInterrupt(ADCA_BASE, ADC_INT_NUMBER1);
+     ADC_clearInterruptStatus(ADCA_BASE, ADC_INT_NUMBER1);
+
+     //
+     // Configure SOCs of ADCD
+     // - SOC0 will convert pin D2.
+     // - SOC1 will convert pin D3.
+     // - Both will be triggered by software only.
+     // - For 12-bit resolution, a sampling window of 15 (75 ns at a 200MHz
+     //   SYSCLK rate) will be used.  For 16-bit resolution, a sampling window
+     //   of 64 (320 ns at a 200MHz SYSCLK rate) will be used.
+     // - NOTE: A longer sampling window will be required if the ADC driving
+     //   source is less than ideal (an ideal source would be a high bandwidth
+     //   op-amp with a small series resistance). See TI application report
+     //   SPRACT6 for guidance on ADC driver design.
+     //
+
+ #if(EX_ADC_RESOLUTION == 12)
+     ADC_setupSOC(ADCD_BASE, ADC_SOC_NUMBER0, ADC_TRIGGER_SW_ONLY,
+                  ADC_CH_ADCIN2, 15);
+     ADC_setupSOC(ADCD_BASE, ADC_SOC_NUMBER1, ADC_TRIGGER_SW_ONLY,
+                  ADC_CH_ADCIN3, 15);
+ #elif(EX_ADC_RESOLUTION == 16)
+     ADC_setupSOC(ADCD_BASE, ADC_SOC_NUMBER0, ADC_TRIGGER_SW_ONLY,
+                  ADC_CH_ADCIN2, 64);
+     ADC_setupSOC(ADCD_BASE, ADC_SOC_NUMBER1, ADC_TRIGGER_SW_ONLY,
+                  ADC_CH_ADCIN3, 64);
+ #endif
+
+     //
+     // Set SOC1 to set the interrupt 1 flag. Enable the interrupt and make
+     // sure its flag is cleared.
+     //
+     ADC_setInterruptSource(ADCD_BASE, ADC_INT_NUMBER1, ADC_SOC_NUMBER1);
+     ADC_enableInterrupt(ADCD_BASE, ADC_INT_NUMBER1);
+     ADC_clearInterruptStatus(ADCD_BASE, ADC_INT_NUMBER1);
 
 }
-//
-// configureADC - Write ADC configurations and power up the ADC for both
-//                ADC A and ADC B
-//
+
 void configureADC(uint32_t adcBase)
 {
     //

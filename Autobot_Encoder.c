@@ -17,32 +17,90 @@
 #include <stdint.h>
 #include <Autobot_Encoder.h>
 #include <Autobot_MotorControl.h>
+#include <math.h>
 //GLOBAL
 volatile unsigned char encoderAPrevState = 0;
 volatile unsigned char encoderBPrevState = 0;
-
+volatile unsigned char DirectionStatus=0;
 volatile long int EncoderCount = 0;
 volatile long int prevEncoderCount = 0;
 volatile long int DeltaCount[256];
 volatile long int velocity = 0;
 volatile int indexCount=0;
 volatile long int prevEncoderCountSpeed=0;
-volatile long int Sample_Speed[500];
+volatile long int Sample_Speed[250];
 volatile unsigned char init_Count=2; // 0 ready for calibrate //1 is durring //2 is finish
 volatile unsigned char finish_Calibrate=0; //0 not finish/ 1 finish
-volatile long int Total_Of_Count=0;
+volatile long int Total_Of_Count=1553387;//1553387
 uint16_t cpuTimer0IntCount;
 uint16_t cpuTimer1IntCount;
 uint16_t cpuTimer2IntCount;
+//PID CONTROL POSITION
+volatile float Kp_Position = 0.1;  // Proportional gain
+volatile float Ki_Position = 0.01; // Integral gain
+volatile float Kd_Position = 0.05; // Derivative gain
+volatile float integral_term_Position = 0.0;
+volatile float previous_error_Position = 0.0;
+volatile float Desired_Position=50;
+// Global variables for PI controller
+volatile float integral_term = 0.0;
+volatile float previous_error = 0.0;
+volatile long int setpoint_count_per_sec = 400; // Setpoint for counts per second
+volatile float Kp = 11.5830973008807;
+volatile float Ki = 723.180469515105;
+
+volatile long int feedback_value_count_per_sec;
+volatile unsigned char TensileTesterStatus=0; //0 not Done //1 DONE
 //15      GPIO58      Encoder channel A
 //14      GPIO59      Encoder channel B
 //13      GPIO124     Encoder index channel M
+// Function to calculate position control
+//void voidPositionControl(unsigned char PositionInPercent)
+//{
+////    // Convert position in percent to target count
+////    float target_count = (float)PositionInPercent / 100.0 * Total_Of_Count;
+////
+////    // Feedback mechanism to get current count (assuming it's stored in a global variable)
+////    float current_count = EncoderCount;
+////
+////    // Calculate error
+////    float error = target_count - current_count;
+////
+////    // Integral term calculation
+////    integral_term += error;
+////
+////    // Derivative term calculation
+////    float derivative_term = error - previous_error;
+////
+////    // Calculate control output
+////    float control_output = Kp * error + Ki * integral_term + Kd * derivative_term;
+////
+////    // Convert control output to PWM duty cycle
+////    float pwm_duty_cycle = control_output;
+////
+////    // Ensure PWM duty cycle is within bounds
+////    if (pwm_duty_cycle > 100)
+////    {
+////        pwm_duty_cycle = 100;
+////    } else if (pwm_duty_cycle < 0)
+////    {
+////        pwm_duty_cycle = 0;
+////    }
+////
+////    // Apply PWM duty cycle to control the actuator
+////    MotorDriver_setSpeed(pwm_duty_cycle);
+////
+////    // Update previous error
+////    previous_er= error;
+//}
 void Calibrate() // 1 day / Dont fking touching this fuction
 {
     GPIO_disableInterrupt(GPIO_INT_XINT4);
     GPIO_disableInterrupt(GPIO_INT_XINT5);
     init_Count=0;
     MotorDriver_setDirection(MOVE_UP);
+    DEVICE_DELAY_US(100000);
+    DEVICE_DELAY_US(100000);
     MotorDriver_setSpeed(100);
     unsigned char LScheckUp=1,LScheckDown=1;
     DEVICE_DELAY_US(100000);
@@ -50,33 +108,41 @@ void Calibrate() // 1 day / Dont fking touching this fuction
 //Not pull =1 when it hitt =0 for both UP and Down LS
     while(LScheckUp!=0)//LScheckUp==0 || LScheckDown==0LScheckUp==0 || LScheckDown==0
     {
-        LScheckUp =GPIO_readPin(7);
+        LScheckUp =GPIO_readPin(27);
     }
     MotorDriver_stop();
+    DEVICE_DELAY_US(100000);
+    DEVICE_DELAY_US(100000);
     if(init_Count==0)
     {
 
         EncoderCount=0; //start Measure
         MotorDriver_setDirection(MOVE_DOWN);
+        DEVICE_DELAY_US(100000);
+        DEVICE_DELAY_US(100000);
         MotorDriver_setSpeed(100);
         init_Count=1;
     }
     while(LScheckDown!=0)
     {
-        LScheckDown =GPIO_readPin(6);
+        LScheckDown =GPIO_readPin(26);
     }
     MotorDriver_stop();
     if(init_Count==1)
     {
-        Total_Of_Count=abs(EncoderCount)+60000;
+        Total_Of_Count=fabs(EncoderCount)-60000;
         EncoderCount=0;
         MotorDriver_setDirection(MOVE_UP);
+        DEVICE_DELAY_US(100000);
+        DEVICE_DELAY_US(100000);
         MotorDriver_setSpeed(50);
         finish_Calibrate=1;
         init_Count=2;
     }
     while(EncoderCount<=30000);
     MotorDriver_stop();
+    DEVICE_DELAY_US(100000);
+    DEVICE_DELAY_US(100000);
 
     EncoderCount=0;
     GPIO_enableInterrupt(GPIO_INT_XINT4);         // Enable XINT1
@@ -104,9 +170,9 @@ void Autobot_Encoder_init()
     // Configure CPU-Timer 0, 1, and 2 to interrupt every second:
     // 1 second Period (in uSeconds)
     //
-    configCPUTimer(CPUTIMER0_BASE, DEVICE_SYSCLK_FREQ, 1000000);
-    configCPUTimer(CPUTIMER1_BASE, DEVICE_SYSCLK_FREQ, 1000);
-    configCPUTimer(CPUTIMER2_BASE, DEVICE_SYSCLK_FREQ, 1000000);
+    configCPUTimer(CPUTIMER0_BASE, DEVICE_SYSCLK_FREQ, 100000);
+    configCPUTimer(CPUTIMER1_BASE, DEVICE_SYSCLK_FREQ, 10000);
+    configCPUTimer(CPUTIMER2_BASE, DEVICE_SYSCLK_FREQ, 200000);
 
     //
     // To ensure precise timing, use write-only instructions to write to the
@@ -182,14 +248,33 @@ void Autobot_Encoder_init()
     GPIO_enableInterrupt(GPIO_INT_XINT3);         // Enable XINT3
     //////////////////////////FOR lIMIT SWITCH INT/////////////////////
     //////
-    GPIO_setPadConfig(7, GPIO_PIN_TYPE_PULLUP);     // Enable pullup on GPIO7   GPIO_PIN_TYPE_PULLUP LS_UP
-    GPIO_setPinConfig(GPIO_7_GPIO7);               // GPIO7 = GPIO7 LS_UP
-    GPIO_setDirectionMode(7, GPIO_DIR_MODE_IN);     // GPIO7 = input LS_UP
-    GPIO_setPadConfig(6, GPIO_PIN_TYPE_PULLUP);     // Enable pullup on GPIO6  GPIO_PIN_TYPE_STD LS_DOWN
-    GPIO_setPinConfig(GPIO_6_GPIO6);                //LS_DOWN
-    GPIO_setDirectionMode(6, GPIO_DIR_MODE_IN);     // GPIO6 = input LS_DOWN
-    GPIO_setInterruptPin(6,GPIO_INT_XINT4);
-    GPIO_setInterruptPin(7,GPIO_INT_XINT5);
+//    GPIO_setPadConfig(7, GPIO_PIN_TYPE_PULLUP);     // Enable pullup on GPIO7   GPIO_PIN_TYPE_PULLUP LS_UP
+//    GPIO_setPinConfig(GPIO_7_GPIO7);               // GPIO7 = GPIO7 LS_UP
+//    GPIO_setDirectionMode(7, GPIO_DIR_MODE_IN);     // GPIO7 = input LS_UP
+//    GPIO_setPadConfig(6, GPIO_PIN_TYPE_PULLUP);     // Enable pullup on GPIO6  GPIO_PIN_TYPE_STD LS_DOWN
+//    GPIO_setPinConfig(GPIO_6_GPIO6);                //LS_DOWN
+//    GPIO_setDirectionMode(6, GPIO_DIR_MODE_IN);     // GPIO6 = input LS_DOWN
+//    GPIO_setInterruptPin(6,GPIO_INT_XINT4);
+//    GPIO_setInterruptPin(7,GPIO_INT_XINT5);
+//
+//    // Falling edge interrupt
+//    GPIO_setInterruptType(GPIO_INT_XINT4, GPIO_INT_TYPE_FALLING_EDGE);
+//    // // Falling edge interrupt
+//    GPIO_setInterruptType(GPIO_INT_XINT5, GPIO_INT_TYPE_FALLING_EDGE);
+//    //
+//    // Enable XINT1 and XINT2
+//    //
+//    GPIO_enableInterrupt(GPIO_INT_XINT4);         // Enable XINT1
+//    GPIO_enableInterrupt(GPIO_INT_XINT5);         // Enable XINT2
+    ////CHANGE HERE
+    GPIO_setPadConfig(27, GPIO_PIN_TYPE_PULLUP);     // Enable pullup on GPIO7   GPIO_PIN_TYPE_PULLUP LS_UP
+    GPIO_setPinConfig(GPIO_27_GPIO27);               // GPIO7 = GPIO7 LS_UP
+    GPIO_setDirectionMode(27, GPIO_DIR_MODE_IN);     // GPIO7 = input LS_UP
+    GPIO_setPadConfig(26, GPIO_PIN_TYPE_PULLUP);     // Enable pullup on GPIO6  GPIO_PIN_TYPE_STD LS_DOWN
+    GPIO_setPinConfig(GPIO_26_GPIO26);                //LS_DOWN
+    GPIO_setDirectionMode(26, GPIO_DIR_MODE_IN);     // GPIO6 = input LS_DOWN
+    GPIO_setInterruptPin(26,GPIO_INT_XINT4);
+    GPIO_setInterruptPin(27,GPIO_INT_XINT5);
 
     // Falling edge interrupt
     GPIO_setInterruptType(GPIO_INT_XINT4, GPIO_INT_TYPE_FALLING_EDGE);
@@ -425,11 +510,11 @@ configCPUTimer(uint32_t cpuTimer, float freq, float period)
 ////
 //// cpuTimer2ISR - Counter for CpuTimer2
 ////
-__interrupt void
-cpuTimer2ISR(void)
-{
-//    //
-//    // The CPU acknowledges the interrupt.
-//    //
-//    cpuTimer2IntCount++;
-}
+//__interrupt void
+//cpuTimer2ISR(void)
+//{
+////    //
+////    // The CPU acknowledges the interrupt.
+////    //
+////    cpuTimer2IntCount++;
+//}
