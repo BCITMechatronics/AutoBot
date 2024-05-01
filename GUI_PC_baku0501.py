@@ -61,7 +61,7 @@ txtBoxHeight = 30
 btnHeight = 22
 NUM_DATA_POINT =  1
 READ_SIZE = 3
-TEST_WITH_TMS = False
+TEST_WITH_TMS = True
 
 ## MECH PROPERTY
 NM_PER_COUNT = 0.093612752      # lead screw moves per 1 encoder count
@@ -563,36 +563,13 @@ class __Tensile_Tester_Application(ttk.Frame):
                              anchor='center')
         
         # Radio buttons in tune frame
-        radioBtnFrame_PWM = ttk.Frame(tuneFrame)
-        radioBtnFrame_PWM.place(relwidth=1,relheight=0.1,rely=1,anchor='sw')
-        radioBtnFrame_DIR = ttk.Frame(tuneFrame,style='dark')
-        radioBtnFrame_DIR.place(relwidth=1,relheight=0.05,rely=0.9,anchor='sw')
+        radioBtnFrame = ttk.Frame(tuneFrame)
+        radioBtnFrame.place(relwidth=1,relheight=0.1,rely=1,anchor='sw')
 
-        self.dirVar = tk.IntVar()
         self.radVar = tk.IntVar()
 
-        ttk.Radiobutton(        # moveup radiobutton
-                        radioBtnFrame_DIR,
-                        text='Move Up',
-                        variable=self.dirVar,
-                        value=1,
-                        command=self.__update_dir,
-                        ).pack(
-                            side = 'left', 
-                            expand = True, 
-                            fill = 'both')       
-        ttk.Radiobutton(        # movedown radiobutton
-                        radioBtnFrame_DIR,
-                        text='Move Down',
-                        variable=self.dirVar,
-                        value=2,
-                        command=self.__update_dir).pack(
-                            side = 'left', 
-                            expand = True, 
-                            fill = 'both')
-        
         ttk.Radiobutton(        # slow radiobutton
-                        radioBtnFrame_PWM,
+                        radioBtnFrame,
                         style='success-toolbutton',
                         text='Slow',
                         variable=self.radVar,
@@ -602,7 +579,7 @@ class __Tensile_Tester_Application(ttk.Frame):
                             expand = True, 
                             fill = 'both')
         ttk.Radiobutton(        # medium radiobutton
-                        radioBtnFrame_PWM,
+                        radioBtnFrame,
                         style='warning-toolbutton',
                         text='Medium',
                         variable=self.radVar,
@@ -612,7 +589,7 @@ class __Tensile_Tester_Application(ttk.Frame):
                             expand = True, 
                             fill = 'both')     
         ttk.Radiobutton(        # fast radiobutton
-                        radioBtnFrame_PWM,
+                        radioBtnFrame,
                         style='danger-toolbutton',
                         text='Fast',
                         variable=self.radVar,
@@ -746,16 +723,6 @@ class __Tensile_Tester_Application(ttk.Frame):
         self.test_flag = False
 
 
-    def __update_dir(self):
-        dirVal = self.dirVar.get()
-        if (dirVal == 1):
-            messagebox.showinfo("Information", "Moving down")
-            if TEST_WITH_TMS:
-                ser.write("MOVE UP\r".encode())
-        elif (dirVal == 2):
-            messagebox.showinfo("Information", "Moving down")
-            if TEST_WITH_TMS:
-                ser.write("MOVE DOWN\r".encode())
 
     # Purpose : to inform the TMS and update the PWM based on user selected speed
     # Function: get the selection value, and send command to TMS through UART
@@ -852,7 +819,7 @@ class __Tensile_Tester_Application(ttk.Frame):
         # print(self.int_tunePos)
         self.tunePos.set(self.int_tunePos)
         posPercent = self.posSash / SCREEN_HEIGHT
-        self.tuneLable.place(y=self.panFullRange*2*(PANWINDOW_RELY*1.28),
+        self.tuneLable.place(y=self.panFullRange*2*(PANWINDOW_RELY*1.31),
                              relx=0.5,
                              rely=posPercent,
                              anchor='center')
@@ -1317,12 +1284,12 @@ ITEM_RELWID = 0.7
 
 # Other
 PANWINDOW_RELHEIGHT = 0.3
-PANWINDOW_RELY = 0.65
+PANWINDOW_RELY = 0.7
 SEPERATOR_TOP_RELY = 0.05
 SEPERATOR_FORCE_TOP_RELY = 0.15
 SEPERATOR_FORCE_BOT_RELY = 0.35
-SEPERATOR_MID_RELY = 0.45
-SEPERATOR_BOT_RELY = 0.83
+SEPERATOR_MID_RELY = 0.5
+SEPERATOR_BOT_RELY = 0.88
 #%%#########################  GUI Init  #######################################   
 app = __Tensile_Tester_Application(master = root)
 # root.withdraw()
