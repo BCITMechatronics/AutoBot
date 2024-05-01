@@ -17,6 +17,13 @@
 #  9. 检查所需文件夹并创建                 - 2024/04/20 完成
 # 10. 创建简易用户名登陆，用于backup data  - 2024/04/25 完成（NEW）
 
+# conda install numpy
+# pip install ttkbootstrap
+# conda install matplotlib
+# conda install pyserial
+# conda install pandas
+
+
 import tkinter as tk
 from tkinter import messagebox, filedialog, ttk
 # from tkinter.scrolledtext import ScrolledText
@@ -52,9 +59,9 @@ COM_PORT = "COM8"
  
 txtBoxHeight = 30
 btnHeight = 22
-NUM_DATA_POINT =  4
-READ_SIZE = 4
-TEST_WITH_TMS = False
+NUM_DATA_POINT =  1
+READ_SIZE = 3
+TEST_WITH_TMS = True
 
 ## MECH PROPERTY
 NM_PER_COUNT = 0.093612752      # lead screw moves per 1 encoder count
@@ -104,7 +111,7 @@ class __Tensile_Tester_Application(ttk.Frame):
         self.test_flag = False
         # self.xlim = 1
         # self.ylim = 0
-
+        self.csv_index = 0
         self.needed_file = ['asset','user','dataset']
         self.__check_or_create_folder()
 
@@ -592,6 +599,13 @@ class __Tensile_Tester_Application(ttk.Frame):
                             expand = True, 
                             fill = 'both')
         
+        # self.checkVar = tk.IntVar()
+        # ttk.Checkbutton(
+        #     master=tuneFrame,
+        #     text='Move Up',
+        #     variable=self.checkVar,
+        #     command=self.__get_dir
+        # ).place(relx)
         
 
 #%%#########################  CHART FRAME  ####################################
@@ -671,7 +685,7 @@ class __Tensile_Tester_Application(ttk.Frame):
         # messagebox.showinfo("Information", "Starting tensile testing") 
         self.strain=[]
         self.stress=[]
-
+        ser.reset_input_buffer()
         self.ultimateSt = 0
         self.data_count = 0
         self.test_flag = True
@@ -684,10 +698,14 @@ class __Tensile_Tester_Application(ttk.Frame):
         self.figTens.legend()
 
         if TEST_WITH_TMS:
+            ser.write("START\r".encode())
+            time.sleep(0.05)
             while(ser.in_waiting):
+                time.sleep(0.2)
                 if not self.__xq_cmd():
+                    print("send STOP")
                     break    
-                ser.write("STOP")
+            ser.write(("STOP\r").encode())
         else:
             self.__fake_datainput() 
             while(True):
@@ -712,15 +730,15 @@ class __Tensile_Tester_Application(ttk.Frame):
     def __update_PWM(self):
         if self.radVar.get() == 1:
             if TEST_WITH_TMS:
-                ser.write("PWM,10")
+                ser.write(("PWM,10\r").encode())
             messagebox.showinfo("Information","device is set to slow mode (PWM = 10% Duty Cycle)")
         elif self.radVar.get() == 2:
             if TEST_WITH_TMS:
-                ser.write("PWM,50")            
+                ser.write(("PWM,50\r").encode())            
             messagebox.showinfo("Information","device is set to medium mode (PWM = 50% Duty Cycle)")
         elif self.radVar.get() ==3:
             if TEST_WITH_TMS:
-                ser.write("PWM,100")    
+                ser.write(("PWM,100\r").encode())    
             messagebox.showinfo("Information","device is set to fast mode (PWM = 100% Duty Cycle)")
 
 
@@ -751,6 +769,7 @@ class __Tensile_Tester_Application(ttk.Frame):
             text="Start calibration",
             command=self.__calibration_initialzation).pack(
                 pady=20)
+        ser.reset_input_buffer()
         self.caliTop.grab_set()  # prevent user interact with main window
     
 
@@ -769,12 +788,18 @@ class __Tensile_Tester_Application(ttk.Frame):
         toast.show_toast()
 
         if TEST_WITH_TMS:
-            ser.write("CALIBRATE")
+            ser.write(("CALIBRATE\r").encode())
             time.sleep(0.05)
-            while(ser.read().decode()!='E'):      # polling to get calibration result from TMS
-                continue
+            while(not ser.in_waiting):      # polling to get calibration result from TMS
+                time.sleep(0.1)
+            # cmd = ser.read().decode()
+            cmd = ser.read(1).decode().strip()
+            print("received " + cmd)
             messagebox.showinfo("Information","Done calibration")
-            self.max_range = int.from_bytes(ser.read(READ_SIZE),byteorder='little')
+            self.max_range = ser.read(3)
+            print("max range is:", self.max_range)
+            self.max_range = int.from_bytes(self.max_range,byteorder='little')
+            print("max range is:", self.max_range)
             self.caliTop.destroy()
 
         self.dimbtn.configure(state='enable')
@@ -791,6 +816,7 @@ class __Tensile_Tester_Application(ttk.Frame):
         posTensile = 100 - (self.posSash * 100 / self.panFullRange)
         # print("Position at:", posTensile)
         self.int_tunePos = int(posTensile)
+        # print(self.int_tunePos)
         self.tunePos.set(self.int_tunePos)
         posPercent = self.posSash / SCREEN_HEIGHT
         self.tuneLable.place(y=self.panFullRange*2*(PANWINDOW_RELY*1.31),
@@ -808,7 +834,8 @@ class __Tensile_Tester_Application(ttk.Frame):
     def __send_pos(self,event):
         if not self.test_flag:
             if TEST_WITH_TMS:
-                ser.write("POS,{}".format(self.int_tunePos))
+                print("Send position at: ", self.int_tunePos)
+                ser.write(("POS,{}\r".format(self.int_tunePos)).encode())
 
     def __update_pos(self, posData):
         if self.test_flag:
@@ -964,7 +991,7 @@ class __Tensile_Tester_Application(ttk.Frame):
             # print("entered __xq_cmd")   
 
             if TEST_WITH_TMS: 
-                Cmd_Byte = (ser.read().decode) # Obtain Cmd_Byte
+                Cmd_Byte = (ser.read().decode().strip()) # Obtain Cmd_Byte
                 print('\ncommand: ' + Cmd_Byte + ' type:', type(Cmd_Byte))
                 # Cmd_Byte = (ser.read()) # Obtain Cmd_Byte
                 # print('\ncommand: ', Cmd_Byte, ' type:', type(Cmd_Byte))
@@ -1041,7 +1068,7 @@ class __Tensile_Tester_Application(ttk.Frame):
                 new_dataIn = (ser.read(READ_SIZE))    # Obtain serial data from TMS
                 # print("Reading byte: ", new_dataIn)
                 new_dataIn = int.from_bytes(new_dataIn,byteorder='little')
-                # print("Converting int: ", new_dataIn)
+                print("Converting int: ", new_dataIn)
             else:
                 new_dataIn = int(self.fakeData[self.data_count])
                 # print("Converting int: ", new_dataIn)
@@ -1058,10 +1085,10 @@ class __Tensile_Tester_Application(ttk.Frame):
                 elif new_dataIn < (self.ultimateSt * 0.05):     # 5% of ultimate Strength to determine breaks
                     # print("Ultimate Strength is: ", self.ultimateSt)
                     self.segUltSt.set(self.ultimateSt)
-                    return 0
+                    # return 0
                 # print("appended stress: ", new_dataIn)
                 force = round(new_dataIn,2)
-                self.__update_force(force)
+                # self.__update_force(force)
                 new_dataIn = new_dataIn * self.inv_area     # stress
                 self.stress.append(new_dataIn)
                 if new_dataIn>self.ylim:
@@ -1070,7 +1097,7 @@ class __Tensile_Tester_Application(ttk.Frame):
 
             elif strainFlag == True:
                 strainFlag = False
-                self.__update_pos(new_dataIn)
+                # self.__update_pos(new_dataIn)
                 # print("inv_length: ",self.inv_length)
                 new_dataIn = new_dataIn * MM_PER_COUNT * self.inv_length
                 # print("delL: ",new_dataIn * MM_PER_COUNT)
@@ -1088,15 +1115,16 @@ class __Tensile_Tester_Application(ttk.Frame):
             if self.stop_pressed:
                 self.__data_concat()
                 if TEST_WITH_TMS:
-                    # ser.write("STOP")
+                    print("stop pressed")
                     return 0
-                break
 
         return 1
           
     def __stop_plot(self):
         self.stop_pressed = True
+        ser.write("STOP\r".encode())
         messagebox.showinfo("Information","Process has been stopped")
+        ser.reset_input_buffer()
         
     def __data_concat(self):
         self.df_stress = np.array(self.stress)
