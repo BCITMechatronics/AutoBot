@@ -59,12 +59,13 @@ COM_PORT = "COM8"
  
 txtBoxHeight = 30
 btnHeight = 22
-TEST_WITH_TMS = True
+NUM_DATA_POINT =  1
+READ_SIZE = 3
+TEST_WITH_TMS = False
 
 ## MECH PROPERTY
-NM_PER_COUNT = 0.093612752          # lead screw moves per 1 encoder count
-MM_PER_COUNT = 0.000331925          # lead screw moves per 1 encoder count
-COUNT_PER_NM = 10.68230524          # count accumulation per 1 nm movement
+NM_PER_COUNT = 0.093612752      # lead screw moves per 1 encoder count
+COUNT_PER_NM = 10.68230524        # count accumulation per 1 nm movement
 MAX_COUNT = 6719170                 # default max count (not accurate, only used when user not want to calibrate)
 ADC_BIT = 16                        # ADC Bit size for differential mode
 ADC_N_MAX = 2**ADC_BIT              # number of steps for ADC
@@ -73,18 +74,16 @@ LOAD_CELL_CAP = 4900                # load cell capacity in kN
 
 if TEST_WITH_TMS:
     V_LSB_MV = 3300/ADC_N_MAX       # V_LSB in mV
+    MM_PER_COUNT = NM_PER_COUNT / 10**6
     LVDT_NEWTON_PER_MV = 2.03412143    # LVDT output voltage per Newton
     CRITICAL_FORCE = 0.9*LOAD_CELL_CAP  # 90% of maximum capacity of load cell
     HIGH_FORCE = 0.6*LOAD_CELL_CAP    # 60% of maximum capacity of load cell
-    READ_SIZE = 3
-    NUM_DATA_POINT =  1
 else:
-    V_LSB_MV = 3300000/ADC_N_MAX    # V_LSB in mV
+    V_LSB_MV = 3300000/ADC_N_MAX    # V_LSB in mV    
+    MM_PER_COUNT = NM_PER_COUNT
     LVDT_NEWTON_PER_MV = 2.03412143    # LVDT output voltage per Newton
     CRITICAL_FORCE = 0.1*LOAD_CELL_CAP  # 90% of maximum capacity of load cell
     HIGH_FORCE = 0.05*LOAD_CELL_CAP    # 60% of maximum capacity of load cell
-    READ_SIZE = 4
-    NUM_DATA_POINT =  4
     
 
 if TEST_WITH_TMS:
@@ -110,8 +109,8 @@ class __Tensile_Tester_Application(ttk.Frame):
         self.master = master
         self.login_userID = 'Jesus'
         self.test_flag = False
-        self.xlim = 0
-        self.ylim = 0
+        # self.xlim = 1
+        # self.ylim = 0
         self.csv_index = 0
         self.needed_file = ['asset','user','dataset']
         self.__check_or_create_folder()
@@ -123,7 +122,7 @@ class __Tensile_Tester_Application(ttk.Frame):
             ser.reset_input_buffer()
 
         # image_files = {
-        #     'BCIT_ICON': 'BCIT-Blackandwhite.jpg'
+        #     'toast_icon': 'toast_Icon.png'
         # }
 
         # self.photoimages = []
@@ -502,8 +501,8 @@ class __Tensile_Tester_Application(ttk.Frame):
                         anchor='center')
         
         label_dir = {'  force indicator  ':SEPERATOR_TOP_RELY,
-                     '  AutoBot  ':SEPERATOR_MID_RELY,
-                     '  move gripper  ':SEPERATOR_BOT_RELY}
+                     '  position indicator  \n(drag to control)':SEPERATOR_MID_RELY,
+                     '  speed selection  ':SEPERATOR_BOT_RELY}
         for key,val in label_dir.items():
             ttkbs.Label(
                 master=tuneFrame,
@@ -533,35 +532,35 @@ class __Tensile_Tester_Application(ttk.Frame):
                          rely=0.25,
                          anchor='center')
         
-        # self.panedwindow = ttk.Panedwindow(
-        #                             master=tuneFrame, 
-        #                             orient=tk.VERTICAL,
-        #                             style='danger')
-        # self.panedwindow.place(relx=0.5,
-        #                   rely=PANWINDOW_RELY,
-        #                   relheight=PANWINDOW_RELHEIGHT,
-        #                   relwidth=0.5,
-        #                   anchor='center'
-        #                   )
+        self.panedwindow = ttk.Panedwindow(
+                                    master=tuneFrame, 
+                                    orient=tk.VERTICAL,
+                                    style='danger')
+        self.panedwindow.place(relx=0.5,
+                          rely=PANWINDOW_RELY,
+                          relheight=PANWINDOW_RELHEIGHT,
+                          relwidth=0.5,
+                          anchor='center'
+                          )
         
-        # panTop = ttk.Frame(self.panedwindow,style='dark.TFrame')
-        # panBot = ttk.Frame(self.panedwindow,style='dark.TFrame')
+        panTop = ttk.Frame(self.panedwindow,style='dark.TFrame')
+        panBot = ttk.Frame(self.panedwindow,style='dark.TFrame')
 
-        # self.panedwindow.add(panTop)
-        # self.panedwindow.add(panBot)
+        self.panedwindow.add(panTop)
+        self.panedwindow.add(panBot)
         
-        # self.panedwindow.bind("<ButtonRelease-1>", self.__send_pos)
-        # panBot.bind("<Configure>",self.__label_travel)
+        self.panedwindow.bind("<ButtonRelease-1>", self.__send_pos)
+        panBot.bind("<Configure>",self.__label_travel)
 
-        # self.tunePos = tk.IntVar()
-        # self.tuneLable = tk.DoubleVar()
-        # self.tuneLable = ttk.Label(
-        #     tuneFrame,
-        #     textvariable=self.tunePos,
-        #     style='inverse-dark')        
-        # self.tuneLable.place(relx=0.5,
-        #                      rely=0.05,
-        #                      anchor='center')
+        self.tunePos = tk.IntVar()
+        self.tuneLable = tk.DoubleVar()
+        self.tuneLable = ttk.Label(
+            tuneFrame,
+            textvariable=self.tunePos,
+            style='inverse-dark')        
+        self.tuneLable.place(relx=0.5,
+                             rely=0.05,
+                             anchor='center')
         
         # Radio buttons in tune frame
         radioBtnFrame_PWM = ttk.Frame(tuneFrame)
@@ -709,11 +708,10 @@ class __Tensile_Tester_Application(ttk.Frame):
         # messagebox.showinfo("Information", "Starting tensile testing") 
         self.strain=[]
         self.stress=[]
+        ser.reset_input_buffer()
         self.ultimateSt = 0
         self.data_count = 0
         self.test_flag = True
-        self.xlim = 0
-        self.ylim = 0
 
         print("Tensile test initiated")
         self.stop_pressed = False # reset software stop status 
@@ -723,11 +721,10 @@ class __Tensile_Tester_Application(ttk.Frame):
         self.figTens.legend()
 
         if TEST_WITH_TMS:
-            ser.reset_input_buffer()
             ser.write("START\r".encode())
             time.sleep(0.05)
             while(ser.in_waiting):
-                time.sleep(0.1)
+                time.sleep(0.2)
                 if not self.__xq_cmd():
                     print("send STOP")
                     break    
@@ -754,11 +751,11 @@ class __Tensile_Tester_Application(ttk.Frame):
         if (dirVal == 1):
             messagebox.showinfo("Information", "Moving down")
             if TEST_WITH_TMS:
-                ser.write(("MOVE,UP\r").encode())
+                ser.write("MOVE UP\r".encode())
         elif (dirVal == 2):
             messagebox.showinfo("Information", "Moving down")
             if TEST_WITH_TMS:
-                ser.write(("MOVE,DOWN\r").encode())
+                ser.write("MOVE DOWN\r".encode())
 
     # Purpose : to inform the TMS and update the PWM based on user selected speed
     # Function: get the selection value, and send command to TMS through UART
@@ -772,7 +769,7 @@ class __Tensile_Tester_Application(ttk.Frame):
             if TEST_WITH_TMS:
                 ser.write(("PWM,50\r").encode())            
             messagebox.showinfo("Information","device is set to medium mode (PWM = 50% Duty Cycle)")
-        elif self.radVar.get() == 3:
+        elif self.radVar.get() ==3:
             if TEST_WITH_TMS:
                 ser.write(("PWM,100\r").encode())    
             messagebox.showinfo("Information","device is set to fast mode (PWM = 100% Duty Cycle)")
@@ -805,8 +802,7 @@ class __Tensile_Tester_Application(ttk.Frame):
             text="Start calibration",
             command=self.__calibration_initialzation).pack(
                 pady=20)
-        if TEST_WITH_TMS:
-            ser.reset_input_buffer()
+        ser.reset_input_buffer()
         self.caliTop.grab_set()  # prevent user interact with main window
     
 
@@ -887,9 +883,9 @@ class __Tensile_Tester_Application(ttk.Frame):
 
     def __update_force(self, fData):
         self.meter.amountusedvar.set(fData)
-        # print("force is: ", fData)
-        # print("Critical Force is: ", CRITICAL_FORCE)
-        # print("Middle Force is: ", HIGH_FORCE)
+        print("force is: ", fData)
+        print("Critical Force is: ", CRITICAL_FORCE)
+        print("Middle Force is: ", HIGH_FORCE)
         if (fData>CRITICAL_FORCE):
             self.meter.configure(bootstyle='danger')
         elif (fData>HIGH_FORCE):
@@ -1020,7 +1016,7 @@ class __Tensile_Tester_Application(ttk.Frame):
         #     self.fakeData = "A112223243536374849596876988995END"
 
         # self.fakeData = "A001122334455667788998877665544332211C"
-        self.fakeData = "A00112233A44556566A66766767A66554433A22112233A44556677A44556566A66766767A66554433A22112233A44556677A44556566A66766767A66554433A22112233A44556677A07080809A09080807A07080809D"
+        self.fakeData = "A00112233A44556566A66766767A66554433A22112233A44556677A07080809A09080807A07080809D"
         time.sleep(0.1)
     
     def __xq_cmd(self):  
@@ -1090,12 +1086,14 @@ class __Tensile_Tester_Application(ttk.Frame):
             ser.close()
     
     def __get_data(self):
+        self.xlim = 0
+        self.ylim = 0
         new_dataIn = 0
         data_size = NUM_DATA_POINT * 2
         count = 0
         # print("entered Cmd_Byte == A")
         strainFlag = False   # To indicate incoming strain or stress data
-        # self.axTens.set_xlim(0, 1)
+        self.axTens.set_xlim(0, 1)
 
         
         while count<data_size:    
@@ -1118,12 +1116,12 @@ class __Tensile_Tester_Application(ttk.Frame):
                 if new_dataIn > self.ultimateSt:
                     self.ultimateSt = new_dataIn
                 elif new_dataIn < (self.ultimateSt * 0.05):     # 5% of ultimate Strength to determine breaks
-                    print("Ultimate Strength is: ", self.ultimateSt)
+                    # print("Ultimate Strength is: ", self.ultimateSt)
                     self.segUltSt.set(self.ultimateSt)
-                    return 0
+                    # return 0
                 # print("appended stress: ", new_dataIn)
                 force = round(new_dataIn,2)
-                self.__update_force(force)
+                # self.__update_force(force)
                 new_dataIn = new_dataIn * self.inv_area     # stress
                 self.stress.append(new_dataIn)
                 if new_dataIn>self.ylim:
@@ -1138,8 +1136,7 @@ class __Tensile_Tester_Application(ttk.Frame):
                 # print("delL: ",new_dataIn * MM_PER_COUNT)
                 self.strain.append(new_dataIn)
                 # new_dataIn = round(new_dataIn,2)
-                if new_dataIn>self.xlim:      
-                    print("set x axis during get data, xlim={}, new_dataIn={}".format(self.xlim,new_dataIn))              
+                if new_dataIn>self.xlim:                    
                     self.xlim = new_dataIn
                     self.axTens.set_xlim(0, 1.2*self.xlim)
                 self.line.set_data(self.strain, self.stress)
@@ -1159,8 +1156,6 @@ class __Tensile_Tester_Application(ttk.Frame):
     def __stop_plot(self):
         self.stop_pressed = True
         ser.write("STOP\r".encode())
-        self.radVar.set(0)
-        self.dirVar.set(0)
         messagebox.showinfo("Information","Process has been stopped")
         ser.reset_input_buffer()
         
@@ -1233,10 +1228,10 @@ class __Tensile_Tester_Application(ttk.Frame):
         self.axTens.plot(history_strain,history_stress, label=selectLabel)
 
         if max_xlim > self.xlim:
-            self.axTens.set_xlim(0, 1.2*max_xlim)
+            self.axTens.set_xlim(0, 2*max_xlim)
             self.xlim = max_xlim
         if max_ylim > self.ylim:
-            self.axTens.set_ylim(0, 1.2*max_ylim)
+            self.axTens.set_ylim(0, 2*max_ylim)
             self.ylim = max_ylim
 
         self.figTens.legend()
