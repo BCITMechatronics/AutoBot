@@ -40,10 +40,9 @@ void voidPositionControl(unsigned char PositionInPercent);
 char succesful_Msg="Successfull!";
 volatile uint32_t i;
 volatile uint32_t Example_PassCount1;
-volatile long int Sample_Strain[750];
-volatile long int Sample_Stress[750];
-unsigned char LSUP_Flag=0;
 
+unsigned char LSUP_Flag=0;
+#define DEBOUNCE_DELAY 100 // Adjust debounce
 void main(void)
 {
     uint16_t receivedChar;
@@ -85,10 +84,10 @@ void main(void)
 
     // Send starting message.
     //
-    EPWM_setCounterCompareValue(myEPWM1_BASE, EPWM_COUNTER_COMPARE_A, 0);
-    msg = "Welcome To Autobot Tensile Tester!";
-    SCI_writeCharArray(SCIA_BASE, (uint16_t*)msg,32);
-    msg = "Command:(/PWM,00/,/POS,00/,/MOVE,UP/,/MOVE,DOWN/,/STOP/,/LVDT/,/CALIBRATE/,/RESETENCODER/,/START/)";
+//    EPWM_setCounterCompareValue(myEPWM1_BASE, EPWM_COUNTER_COMPARE_A, 0);
+//    msg = "Welcome To Autobot Tensile Tester!";
+//    SCI_writeCharArray(SCIA_BASE, (uint16_t*)msg,32);
+//    msg = "Command:(/PWM,00/,/POS,00/,/MOVE,UP/,/MOVE,DOWN/,/STOP/,/LVDT/,/CALIBRATE/,/RESETENCODER/,/START/)";
 //    SCI_writeCharArray(SCIA_BASE, (uint16_t*)msg,70);
     SCI_TxString(SCIA_BASE,msg);
     char stress[6]={1,2,3,4,5,6};
@@ -98,24 +97,24 @@ void main(void)
     char CountString[20];
     while(1)
     {
-        if(LSUP_Flag)
-        {
-            switch(LSUP_Flag)
-            {
-            case UP:
-
-                sprintf(CountString,"LSUP:%d",XINT2Count);
-                SCI_TxString(SCIA_BASE,CountString);
-                LSUP_Flag=0;
-                break;
-            case DOWN:
-                sprintf(CountString,"LSDOWN:%d",XINT1Count);
-                SCI_TxString(SCIA_BASE,CountString);
-                LSUP_Flag=0;
-                break;
-            }
-
-        }
+//        if(LSUP_Flag)
+//        {
+//            switch(LSUP_Flag)
+//            {
+//            case UP:
+//
+//                sprintf(CountString,"LSUP:%d",XINT2Count);
+//                SCI_TxString(SCIA_BASE,CountString);
+//                LSUP_Flag=0;
+//                break;
+//            case DOWN:
+//                sprintf(CountString,"LSDOWN:%d",XINT1Count);
+//                SCI_TxString(SCIA_BASE,CountString);
+//                LSUP_Flag=0;
+//                break;
+//            }
+//
+//        }
 
 //        voidPositionControl(Desired_Position);
         test=SCI_RxString(SCIA_BASE,rxString);
@@ -171,6 +170,7 @@ __interrupt void sciaRXFIFOISR(void)
 __interrupt void
 cpuTimer0ISR(void)
 {
+
 //    // Inside your main loop or wherever PWM control is needed
 
 //    char outputString[50];
@@ -215,6 +215,16 @@ cpuTimer0ISR(void)
     Sample_Strain[cpuTimer0IntCount]= EncoderCount;
     Sample_Stress[cpuTimer0IntCount]= adcAResult0;///Later will be ADC value FROM LVDT adcAResult0-adcAResult1
     cpuTimer0IntCount++;
+    if(EncoderCount<0||EncoderCount>Total_Of_Count)
+    {
+        Interrupt_disable(INT_TIMER0);
+        Interrupt_disable(INT_TIMER1);
+        Interrupt_disable(INT_TIMER2);
+        MotorDriver_stop();
+        Interrupt_disable(INT_TIMER0);
+        Interrupt_disable(INT_TIMER1);
+        Interrupt_disable(INT_TIMER2);
+    }
       Interrupt_clearACKGroup(INTERRUPT_ACK_GROUP1);
 
 }
@@ -222,10 +232,21 @@ cpuTimer0ISR(void)
 __interrupt void
 cpuTimer1ISR(void)
 {
+
     Sample_Speed[cpuTimer0IntCount] = EncoderCount-prevEncoderCountSpeed; //count/milisecond
     feedback_value_count_per_sec = EncoderCount-prevEncoderCountSpeed;
     int pwm = calculatePWM(feedback_value_count_per_sec);
     MotorDriver_setSpeed(pwm);
+    if(EncoderCount<0||EncoderCount>Total_Of_Count)
+    {
+        Interrupt_disable(INT_TIMER0);
+        Interrupt_disable(INT_TIMER1);
+        Interrupt_disable(INT_TIMER2);
+        MotorDriver_stop();
+        Interrupt_disable(INT_TIMER0);
+        Interrupt_disable(INT_TIMER1);
+        Interrupt_disable(INT_TIMER2);
+    }
 //
 
 //        if(cpuTimer1IntCount==0)
@@ -273,10 +294,17 @@ cpuTimer1ISR(void)
 __interrupt void
 cpuTimer2ISR(void)
 {
+    if(EncoderCount<0||EncoderCount>Total_Of_Count)
+    {
+        Interrupt_disable(INT_TIMER0);
+        Interrupt_disable(INT_TIMER1);
+        Interrupt_disable(INT_TIMER2);
+        MotorDriver_stop();
+        Interrupt_disable(INT_TIMER0);
+        Interrupt_disable(INT_TIMER1);
+        Interrupt_disable(INT_TIMER2);
+    }
 
-//    Sample_Strain[cpuTimer0IntCount]= EncoderCount;
-//    Sample_Stress[cpuTimer0IntCount]= cpuTimer2IntCount;///Later will be ADC value FROM LVDT
-//    SCI_writeCharBlockingFIFO(SCIA_BASE,0x41);
     SCI_TxString(SCIA_BASE,"A");
     SCI_writeCharBlockingFIFO(SCIA_BASE,((Sample_Stress[cpuTimer2IntCount])&0xFF));
     SCI_writeCharBlockingFIFO(SCIA_BASE,((Sample_Stress[cpuTimer2IntCount]>>8)&0xFF));
@@ -286,8 +314,6 @@ cpuTimer2ISR(void)
     SCI_writeCharBlockingFIFO(SCIA_BASE,((Sample_Strain[cpuTimer2IntCount])&0xFF));
     SCI_writeCharBlockingFIFO(SCIA_BASE,((Sample_Strain[cpuTimer2IntCount]>>8)&0xFF));
     SCI_writeCharBlockingFIFO(SCIA_BASE,((Sample_Strain[cpuTimer2IntCount]>>16)&0xFF));
-
-
 
 
     cpuTimer2IntCount++;
@@ -334,7 +360,7 @@ void voidPositionControl(unsigned char PositionInPercent)
     float current_count = EncoderCount;
 
     // Calculate error
-    float error = target_count - current_count;
+    float error = (float)target_count - (float)current_count;
 
     // Integral term calculation
     integral_term_Position += error;
@@ -343,17 +369,19 @@ void voidPositionControl(unsigned char PositionInPercent)
     float derivative_term = error - previous_error_Position;
 
     // Calculate control output
-    float control_output = Kp_Position * error + Ki_Position * integral_term_Position + Kd_Position * derivative_term;
+    float control_output = Kp_Position * error+Ki_Position * integral_term_Position+ Kd_Position * derivative_term;;//
+    // Ensure PWM duty cycle is within bounds
+    float pwm_duty_cycle=0;
+    if (pwm_duty_cycle > 100)
+    {
+        pwm_duty_cycle = 100;
+    } else if (pwm_duty_cycle < 0)
+    {
+        MotorDriver_setDirection(MOVE_DOWN);
+       pwm_duty_cycle = 20;
+    }
+    pwm_duty_cycle = control_output;
 
-    // Convert control output to PWM duty cycle
-    unsigned char pwm_duty_cycle = (unsigned char)control_output;
-
-    // Apply PWM duty cycle to control the actuator
-    MotorDriver_setSpeed(pwm_duty_cycle);
-
-    // Update previous error
-    previous_error_Position = error;
-    // Set direction based on the error
     if (error > 0)
     {
         MotorDriver_setDirection(MOVE_UP);
@@ -361,14 +389,17 @@ void voidPositionControl(unsigned char PositionInPercent)
     {
         MotorDriver_setDirection(MOVE_DOWN);
     }
-    // Ensure PWM duty cycle is within bounds
-    if (pwm_duty_cycle > 100)
-    {
-        pwm_duty_cycle = 100;
-    } else if (pwm_duty_cycle < 0)
-    {
-        pwm_duty_cycle = 0;
-    }
+    // Convert control output to PWM duty cycle
+
+
+    // Apply PWM duty cycle to control the actuator
+    MotorDriver_setSpeed(pwm_duty_cycle);
+
+    // Update previous error
+    previous_error_Position = error;
+    // Set direction based on the error
+
+
 }
 
 
@@ -467,15 +498,33 @@ interrupt void xint3_isr(void)
 //JUMP DOWN 2TIME AND JUM UP 1 TIME
 interrupt void xint4_isr(void)////LIMIT SWITCH DOWN HIT AND STOP TO PROTECT SYSTEM
 {
+    Interrupt_disable(INT_TIMER0);
+    Interrupt_disable(INT_TIMER1);
+    Interrupt_disable(INT_TIMER2);
     MotorDriver_stop();
-    EPWM_setCounterCompareValue(myEPWM1_BASE, EPWM_COUNTER_COMPARE_A, 0);
-    XINT1Count++;
-//
-//    GPIO_setInterruptType(GPIO_INT_XINT4, GPIO_INT_TYPE_FALLING_EDGE);
-//    SCI_TxString(SCIA_BASE,"D");
-    LSUP_Flag=2;
-    Interrupt_clearACKGroup(INTERRUPT_ACK_GROUP12);// Clear interrupt flag
 
+
+//    EPWM_setCounterCompareValue(myEPWM1_BASE, EPWM_COUNTER_COMPARE_A, 0);
+//    XINT1Count++;
+////
+////    GPIO_setInterruptType(GPIO_INT_XINT4, GPIO_INT_TYPE_FALLING_EDGE);
+////    SCI_TxString(SCIA_BASE,"D");
+//    LSUP_Flag=2;
+//    Interrupt_clearACKGroup(INTERRUPT_ACK_GROUP12);// Clear interrupt flag
+    // Check debounce timer
+//    if (GPIO_getData(GPIO_INT_XINT4) == 0 && (EPWM_getCounterValue(myEPWM1_BASE) != 0))
+//    {
+//        if (Timer_getPeriod(TIMER0_BASE) - Timer_getValue(TIMER0_BASE) > DEBOUNCE_DELAY)
+//        {
+//            MotorDriver_stop();
+//            EPWM_setCounterCompareValue(myEPWM1_BASE, EPWM_COUNTER_COMPARE_A, 0);
+//            XINT1Count++;
+//        }
+//    }
+//    debounceTimer = Timer_getPeriod(TIMER0_BASE) - Timer_getValue(TIMER0_BASE);
+//    Timer_setCount(TIMER0_BASE, 0); // Reset timer
+//    GPIO_clearInterruptFlag(GPIO_INT_XINT4); // Clear interrupt flag
+    Interrupt_clearACKGroup(INTERRUPT_ACK_GROUP12); // Clear interrupt flag
 }
 
 //
@@ -483,6 +532,10 @@ interrupt void xint4_isr(void)////LIMIT SWITCH DOWN HIT AND STOP TO PROTECT SYST
 //
 interrupt void xint5_isr(void)////LIMIT SWITCH UP HIT AND STOP TO PROTECT SYSTEM
 {
+    Interrupt_disable(INT_TIMER0);
+    Interrupt_disable(INT_TIMER1);
+    Interrupt_disable(INT_TIMER2);
+
     MotorDriver_stop();
     EPWM_setCounterCompareValue(myEPWM1_BASE, EPWM_COUNTER_COMPARE_A, 0);
     XINT2Count++;

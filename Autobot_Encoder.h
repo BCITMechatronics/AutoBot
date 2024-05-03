@@ -25,6 +25,8 @@
 //
 // Function Prototypes
 //
+extern volatile long int Sample_Strain[750];
+extern volatile long int Sample_Stress[750];
 interrupt void xint1_isr(void);
 interrupt void xint2_isr(void);
 interrupt void xint3_isr(void);

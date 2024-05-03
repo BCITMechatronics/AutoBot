@@ -90,7 +90,7 @@ void  Autobot_SCIA_init()
                                                         SCI_CONFIG_STOP_ONE |
                                                         SCI_CONFIG_PAR_NONE));
     SCI_resetChannels(SCIA_BASE);
-    SCI_clearInterruptStatus(SCIA_BASE, SCI_INT_RXRDY_BRKDT);
+    SCI_clearInterruptStatus(SCIA_BASE, SCI_INT_RXFF);
 //    SCI_resetRxFIFO(SCIA_BASE);
 //    SCI_resetTxFIFO(SCIA_BASE);
 //    SCI_clearInterruptStatus(SCIA_BASE, SCI_INT_TXFF | SCI_INT_RXFF);
@@ -120,10 +120,10 @@ void  Autobot_SCIA_init()
     // RX and TX FIFO Interrupts Enabled
     //
     SCI_performSoftwareReset(SCIA_BASE);
-    SCI_enableInterrupt(SCIA_BASE, SCI_INT_RXRDY_BRKDT);//| SCI_INT_TXFF) SCI_INT_RXFF
+//    SCI_enableInterrupt(SCIA_BASE, SCI_INT_RXRDY_BRKDT);//| SCI_INT_TXFF) SCI_INT_RXFF
 //    SCI_disableInterrupt(SCIA_BASE, SCI_INT_RXERR);
 
-//    SCI_setFIFOInterruptLevel(SCIA_BASE, SCI_FIFO_TX2, SCI_FIFO_RX1);
+    SCI_setFIFOInterruptLevel(SCIA_BASE, SCI_FIFO_TX2, SCI_FIFO_RX1);
     SCI_performSoftwareReset(SCIA_BASE);
 
     SCI_resetTxFIFO(SCIA_BASE);

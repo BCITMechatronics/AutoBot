@@ -18,6 +18,8 @@
 #include <Autobot_Encoder.h>
 #include <Autobot_MotorControl.h>
 #include <math.h>
+volatile long int Sample_Strain[750];
+volatile long int Sample_Stress[750];
 //GLOBAL
 volatile unsigned char encoderAPrevState = 0;
 volatile unsigned char encoderBPrevState = 0;
@@ -36,9 +38,9 @@ uint16_t cpuTimer0IntCount;
 uint16_t cpuTimer1IntCount;
 uint16_t cpuTimer2IntCount;
 //PID CONTROL POSITION
-volatile float Kp_Position = 0.1;  // Proportional gain
-volatile float Ki_Position = 0.01; // Integral gain
-volatile float Kd_Position = 0.05; // Derivative gain
+volatile float Kp_Position = 10;  // Proportional gain
+volatile float Ki_Position = 723; // Integral gain
+volatile float Kd_Position = 1; // Derivative gain
 volatile float integral_term_Position = 0.0;
 volatile float previous_error_Position = 0.0;
 volatile float Desired_Position=50;
@@ -98,28 +100,24 @@ void Calibrate() // 1 day / Dont fking touching this fuction
     GPIO_disableInterrupt(GPIO_INT_XINT4);
     GPIO_disableInterrupt(GPIO_INT_XINT5);
     init_Count=0;
-    MotorDriver_setDirection(MOVE_UP);
-    DEVICE_DELAY_US(100000);
-    DEVICE_DELAY_US(100000);
+//    MotorDriver_setDirection(MOVE_UP);
+//    DEVICE_DELAY_US(1000000);
+//    DEVICE_DELAY_US(1000000);
     MotorDriver_setSpeed(100);
     unsigned char LScheckUp=1,LScheckDown=1;
-    DEVICE_DELAY_US(100000);
-    DEVICE_DELAY_US(100000);
 //Not pull =1 when it hitt =0 for both UP and Down LS
-    while(LScheckUp!=0)//LScheckUp==0 || LScheckDown==0LScheckUp==0 || LScheckDown==0
-    {
-        LScheckUp =GPIO_readPin(27);
-    }
-    MotorDriver_stop();
-    DEVICE_DELAY_US(100000);
-    DEVICE_DELAY_US(100000);
+//    while(LScheckUp!=0)//LScheckUp==0 || LScheckDown==0LScheckUp==0 || LScheckDown==0
+//    {
+//        LScheckUp =GPIO_readPin(27);
+//    }
+//    MotorDriver_stop();
+//    DEVICE_DELAY_US(1000000);
+//    DEVICE_DELAY_US(1000000);
     if(init_Count==0)
     {
 
         EncoderCount=0; //start Measure
         MotorDriver_setDirection(MOVE_DOWN);
-        DEVICE_DELAY_US(100000);
-        DEVICE_DELAY_US(100000);
         MotorDriver_setSpeed(100);
         init_Count=1;
     }
@@ -128,21 +126,29 @@ void Calibrate() // 1 day / Dont fking touching this fuction
         LScheckDown =GPIO_readPin(26);
     }
     MotorDriver_stop();
+    DEVICE_DELAY_US(1000000);
+    DEVICE_DELAY_US(1000000);
     if(init_Count==1)
     {
-        Total_Of_Count=fabs(EncoderCount)-60000;
+        if (fabs(EncoderCount)<100000)
+        {
+            Total_Of_Count = 1553387;
+        }
+        else
+        {
+            Total_Of_Count=fabs(EncoderCount)-60000;
+        }
+
         EncoderCount=0;
         MotorDriver_setDirection(MOVE_UP);
-        DEVICE_DELAY_US(100000);
-        DEVICE_DELAY_US(100000);
         MotorDriver_setSpeed(50);
         finish_Calibrate=1;
         init_Count=2;
     }
     while(EncoderCount<=30000);
     MotorDriver_stop();
-    DEVICE_DELAY_US(100000);
-    DEVICE_DELAY_US(100000);
+    DEVICE_DELAY_US(1000000);
+    DEVICE_DELAY_US(1000000);
 
     EncoderCount=0;
     GPIO_enableInterrupt(GPIO_INT_XINT4);         // Enable XINT1
@@ -274,7 +280,7 @@ void Autobot_Encoder_init()
     GPIO_setPinConfig(GPIO_26_GPIO26);                //LS_DOWN
     GPIO_setDirectionMode(26, GPIO_DIR_MODE_IN);     // GPIO6 = input LS_DOWN
     GPIO_setInterruptPin(26,GPIO_INT_XINT4);
-    GPIO_setInterruptPin(27,GPIO_INT_XINT5);
+    //GPIO_setInterruptPin(27,GPIO_INT_XINT5);
 
     // Falling edge interrupt
     GPIO_setInterruptType(GPIO_INT_XINT4, GPIO_INT_TYPE_FALLING_EDGE);

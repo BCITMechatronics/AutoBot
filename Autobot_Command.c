@@ -25,11 +25,11 @@
 #include <Autobot_Command.h>
 
 const char *seps = ", \t\n";
-msg = "Command:(/START/,/PWM,00/,/MOVE,UP/,/MOVE,DOWN/,/STOP/,/LVDT/,/POS,00/)";
+msg = "Command:(/START/,/PWM,00/,/MOVE,UP/,/MOVE,DOWN/,/STOP/,/LVDT/,/POS,00/,/HOME/)";
 void Autobot_Commands(char* command)
 {
     char* token = NULL, * nextTok = NULL;              // for tokenizing the line string
-
+    char* tok = NULL;
     //Break String
     token = strtok(command, seps);             // break first time to check command name
     if (token == NULL)
@@ -50,16 +50,100 @@ void Autobot_Commands(char* command)
     }
     else if (strcmp(token, "START") == 0)
     {
+        GPIO_disableInterrupt(GPIO_INT_XINT4);
+        GPIO_disableInterrupt(GPIO_INT_XINT5);
+        EncoderCount=0;
+        cpuTimer2IntCount=0;
+        TensileTesterStatus=1;
         MotorDriver_setDirection(MOVE_UP);
         setpoint_count_per_sec=440;
-        cpuTimer2IntCount=0;
-
         Interrupt_enable(INT_TIMER2);
         Interrupt_enable(INT_TIMER1);
         Interrupt_enable(INT_TIMER0);
+        unsigned char test=-1;
+        while(1)
+        {
+            test=SCI_RxString(SCIA_BASE,rxString);
+            if(test==0)
+            {
+                token = strtok(rxString, seps);             // break first time to check command name
+                if (token == NULL)
+                {
+                    return -1; //  Nothing To Read
+                }
+                if (strcmp(token, "STOP") == 0)
+                {
+                    Interrupt_disable(INT_TIMER0);
+                    Interrupt_disable(INT_TIMER1);
+                    Interrupt_disable(INT_TIMER2);
+                    MotorDriver_stop();
+                    Interrupt_disable(INT_TIMER0);
+                    Interrupt_disable(INT_TIMER1);
+                    Interrupt_disable(INT_TIMER2);
+                    GPIO_enableInterrupt(GPIO_INT_XINT4);         // Enable XINT1
+                    GPIO_enableInterrupt(GPIO_INT_XINT5);         // Enable XINT2
+                    int i=0;
+                    for ( i = 0; i < 750; i++)
+                    {
+                        Sample_Stress[i] = 0;
+                        Sample_Strain[i] = 0;
+                    }
+                    break;
+                }
+                else test=-1;
+
+            }
+        }
+
 
 
     }
+    else if (strcmp(token, "RESETENCODER") == 0)
+    {
+        EncoderCount=0;
+    }
+    else if (strcmp(token, "HOME") == 0)
+    {
+        EncoderCount=0;
+        GPIO_disableInterrupt(GPIO_INT_XINT4);
+        GPIO_disableInterrupt(GPIO_INT_XINT5);
+        while(EncoderCount<25000)
+        {
+            MotorDriver_setDirection(MOVE_UP);
+            MotorDriver_setSpeed(100);
+
+        }
+        MotorDriver_stop();
+        DEVICE_DELAY_US(1000000);
+        DEVICE_DELAY_US(1000000);
+        EncoderCount=0;
+        unsigned char LScheckUp=1, LScheckDown=1;
+        //Not pull =1 when it hitt =0 for both UP and Down LS
+        while(LScheckDown!=0)//LScheckUp==0 || LScheckDown==0LScheckUp==0 || LScheckDown==0
+        {
+            MotorDriver_setDirection(MOVE_DOWN);
+            MotorDriver_setSpeed(100);
+            LScheckDown =GPIO_readPin(26);
+        }
+
+        MotorDriver_stop();
+
+        DEVICE_DELAY_US(1000000);
+        DEVICE_DELAY_US(1000000);
+        EncoderCount=0;
+        while(EncoderCount<25000)
+        {
+            MotorDriver_setDirection(MOVE_UP);
+            MotorDriver_setSpeed(100);
+        }
+        MotorDriver_stop();
+        DEVICE_DELAY_US(1000000);
+        DEVICE_DELAY_US(1000000);
+        EncoderCount=0;
+        GPIO_enableInterrupt(GPIO_INT_XINT4);         // Enable XINT1
+        GPIO_enableInterrupt(GPIO_INT_XINT5);         // Enable XINT2
+    }
+
     else if (strcmp(token, "RESETENCODER") == 0)
     {
         EncoderCount=0;
@@ -70,6 +154,9 @@ void Autobot_Commands(char* command)
         Interrupt_disable(INT_TIMER1);
         Interrupt_disable(INT_TIMER2);
         MotorDriver_stop();
+        Interrupt_disable(INT_TIMER0);
+        Interrupt_disable(INT_TIMER1);
+        Interrupt_disable(INT_TIMER2);
 //        SCI_TxString(SCIA_BASE,"B");
     }
     // Check if the command is to get vector data from PixyCam
@@ -118,14 +205,22 @@ void Autobot_Commands(char* command)
             return -1; // Invalid
         }
         Desired_Position =atoi(token);
-
+        long long int Desired_EncoderCount=(Desired_Position*Total_Of_Count)/100;
+        unsigned char LScheckUp=-1,LScheckDown=-1;
+        unsigned char test=-1;
         while(1)
         {
             voidPositionControl(Desired_Position);
-            long long int Desired_EncoderCount=(Desired_Position*Total_Of_Count)/100;
+            LScheckUp =GPIO_readPin(27);
+            LScheckDown =GPIO_readPin(26);
+//            if (   LScheckUp==0 ||  LScheckDown==0)
+//            {
+//                Interrupt_disable(INT_TIMER0);
+//                MotorDriver_stop();
+//                break;
+//            }
              if ((EncoderCount>(Desired_EncoderCount-1000))&(EncoderCount<(Desired_EncoderCount+1000)))
              {
-
                  Interrupt_disable(INT_TIMER0);
                  MotorDriver_stop();
                  break;
@@ -148,8 +243,8 @@ void Autobot_Commands(char* command)
         while(1)//LScheckUp==0 || LScheckDown==0LScheckUp==0 || LScheckDown==0
         {
 
-            LScheckUp =GPIO_readPin(7);
-            LScheckDown =GPIO_readPin(6);
+            LScheckUp =GPIO_readPin(27);
+            LScheckDown =GPIO_readPin(26);
             if(LScheckUp==0)
             {
                   msg = "Limit Swith UP it hitted!";
