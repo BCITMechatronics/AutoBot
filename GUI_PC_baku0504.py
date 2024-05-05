@@ -59,7 +59,7 @@ COM_PORT = "COM8"
  
 txtBoxHeight = 30
 btnHeight = 22
-TEST_WITH_TMS = False
+TEST_WITH_TMS = True
 
 ## MECH PROPERTY
 NM_PER_COUNT = 0.093612752          # lead screw moves per 1 encoder count
@@ -122,15 +122,15 @@ class __Tensile_Tester_Application(ttk.Frame):
         if TEST_WITH_TMS:
             ser.reset_input_buffer()
 
-        image_files = {
-            'Ace_Ha':'Ace_Icon.png'
-        }
+        # image_files = {
+        #     'BCIT_ICON': 'BCIT-Blackandwhite.jpg'
+        # }
 
-        self.photoimages = []
-        imgpath = pathlib.Path(__file__).parent / 'asset'
-        for key, val in image_files.items():
-            _path = imgpath / val
-            self.photoimages.append(ttkbs.PhotoImage(name=key, file=_path))
+        # self.photoimages = []
+        # imgpath = pathlib.Path(__file__).parent / 'asset'
+        # for key, val in image_files.items():
+        #     _path = imgpath / val
+        #     self.photoimages.append(ttkbs.PhotoImage(name=key, file=_path))
         
 #%%#########################  FUNCTION DEF  ####################################
     # Purpose: to set up all widgets of the GUI
@@ -139,7 +139,6 @@ class __Tensile_Tester_Application(ttk.Frame):
     # |  Button   |      
     def __GUI_setup(self):
         
-        #### Input Frame ###
         inputFrame = ttk.Frame(
             self.master,
             width=INPUT_FRAME_WIDTH, 
@@ -151,7 +150,6 @@ class __Tensile_Tester_Application(ttk.Frame):
             width=INPUT_FRAME_WIDTH,
             height=INPUT_FRAME_HEIGHT)
 
-        #### Output Frame ###
         outputFrame = ttk.Frame(
             self.master,
             width=OUTPUT_FRAME_WIDTH, 
@@ -160,8 +158,7 @@ class __Tensile_Tester_Application(ttk.Frame):
         outputFrame.place(
             x=0,
             y=INPUT_FRAME_HEIGHT)
-        
-        #### History Frame ###
+
         historyFrame = ttk.Frame(
             self.master,
             width=HISTORY_FRAME_WIDTH, 
@@ -170,8 +167,7 @@ class __Tensile_Tester_Application(ttk.Frame):
         historyFrame.place(
             x=0,
             y=INPUT_FRAME_HEIGHT+OUTPUT_FRAME_HEIGHT)
-        
-        #### Output Frame ###
+
         doneFrame = ttk.Frame(
             self.master,
             width=DONE_FRAME_WIDTH,
@@ -180,8 +176,7 @@ class __Tensile_Tester_Application(ttk.Frame):
         doneFrame.place(
             x=0,
             y=INPUT_FRAME_HEIGHT+OUTPUT_FRAME_HEIGHT+HISTORY_FRAME_HEIGHT)
-        
-        #### Chart Frame ###
+
         chartFrame = ttk.Frame(
             self.master,
             width=CHART_FRAME_WIDTH, 
@@ -190,8 +185,7 @@ class __Tensile_Tester_Application(ttk.Frame):
         chartFrame.place(
             x=INPUT_FRAME_WIDTH+TUNE_FRAME_WIDTH,
             y=0)
-               
-        #### Tune Frame ###         
+                
         tuneFrame = ttk.Frame(
             self.master,
             width=TUNE_FRAME_WIDTH, 
@@ -921,32 +915,8 @@ class __Tensile_Tester_Application(ttk.Frame):
     def __get_user(self,*event):
         self.login_userID = self.userVar.get()
         print("user ID is: " + self.login_userID)
-        if self.login_userID == 'Ace Ha':
-            self.haha = ttkbs.Toplevel(topmost=True)
-            self.haha.geometry("+500+300")
-            ttk.Label(self.haha,image='Ace_Ha').pack(side='left',expand=True,fill='both')
-            self.haha.protocol("WM_DELETE_WINDOW", self.__on_closing)
-            self.haha.bind("<Unmap>", self.__on_minimize)
-            # self.haha.bind("<Configure>", self.__on_resize)
         self.loginTop.destroy()
         messagebox.showinfo("Welcome","Welcome {}".format(self.login_userID))
-    
-    # def __on_resize(self,event):
-    #     ttk.Label(self.haha,image='Ace_Ha').pack(side='left',expand=True,fill='both')
-
-    def __on_minimize(self,event):
-        self.haha.attributes("-topmost", True)
-        self.haha.deiconify()
-
-    def __on_closing(self):
-        answer = messagebox.askyesno("Haha","Really??")
-        if answer:
-            while messagebox.askokcancel("Haha","Try again"):
-                messagebox.askokcancel("Haha","Try again")
-            messagebox.showinfo("Haha","Okay")
-        else:
-            messagebox.showinfo("Haha","Okay")
-            
 
 
     # Purpose : to obtain the test segment cross sectional shape, in order to calculate stress later
