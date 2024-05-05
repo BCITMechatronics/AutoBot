@@ -730,6 +730,8 @@ class __Tensile_Tester_Application(ttk.Frame):
 
         if TEST_WITH_TMS:
             ser.reset_input_buffer()
+            # ser.reset_output_buffer()
+            ser.write("MOVE,UP\r".encode())
             ser.write("START\r".encode())
             time.sleep(0.05)
             while(ser.in_waiting):
@@ -1188,11 +1190,15 @@ class __Tensile_Tester_Application(ttk.Frame):
           
     def __stop_plot(self):
         self.stop_pressed = True
-        ser.write("STOP\r".encode())
+        if TEST_WITH_TMS:
+            ser.write("STOP\r".encode())
+            ser.reset_output_buffer()
+            ser.reset_input_buffer()
+            ser.write("MOVE,UP\r".encode())
         self.radVar.set(0)
-        self.dirVar.set(0)
+        self.dirVar.set(1)
         messagebox.showinfo("Information","Process has been stopped")
-        ser.reset_input_buffer()
+        
         
     def __data_concat(self):
         self.df_stress = np.array(self.stress)
