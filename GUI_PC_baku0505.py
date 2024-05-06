@@ -59,7 +59,7 @@ COM_PORT = "COM8"
  
 txtBoxHeight = 30
 btnHeight = 22
-TEST_WITH_TMS = False
+TEST_WITH_TMS = True
 
 ## MECH PROPERTY
 NM_PER_COUNT = 0.093612752          # lead screw moves per 1 encoder count
@@ -70,7 +70,6 @@ ADC_BIT = 12                        # ADC Bit size for differential mode
 ADC_N_MAX = 2**ADC_BIT              # number of steps for ADC
 
 LOAD_CELL_CAP = 4900                # load cell capacity in kN
-MOVING_AVG_NUM = 3                  # num of points to moving avg
 
 if TEST_WITH_TMS:
     V_LSB_MV = 2820/ADC_N_MAX       # V_LSB in mV
@@ -87,7 +86,7 @@ else:
     CRITICAL_FORCE = 0.1*LOAD_CELL_CAP  # 90% of maximum capacity of load cell
     HIGH_FORCE = 0.05*LOAD_CELL_CAP    # 60% of maximum capacity of load cell
     READ_SIZE = 4
-    NUM_DATA_POINT =  1
+    NUM_DATA_POINT =  4
     
 
 if TEST_WITH_TMS:
@@ -716,8 +715,6 @@ class __Tensile_Tester_Application(ttk.Frame):
     #           6. inform user the testing is done and switch to free-run mode (reset test_flag)
     def __tensileTest(self):
         # messagebox.showinfo("Information", "Starting tensile testing") 
-        self.rawStrain = []
-        self.rawStress = []
         self.strain=[]
         self.stress=[]
         self.ultimateSt = 0
@@ -725,7 +722,6 @@ class __Tensile_Tester_Application(ttk.Frame):
         self.test_flag = True
         self.xlim = 0
         self.ylim = 0
-        self.filter_count = 0
 
         print("Tensile test initiated")
         self.stop_pressed = False # reset software stop status 
@@ -749,10 +745,10 @@ class __Tensile_Tester_Application(ttk.Frame):
             ser.write(("STOP\r").encode())
         else:
             self.__fake_datainput() 
-            while(True): 
-                self.filter_count += 1
+            while(True):
                 if not self.__xq_cmd():
-                    break               
+                    break                
+                # self.data_count += 1 
 
         self.__data_concat()
         if len(self.data) != 0:    
@@ -1059,8 +1055,7 @@ class __Tensile_Tester_Application(ttk.Frame):
         #     self.fakeData = "A112223243536374849596876988995END"
 
         # self.fakeData = "A001122334455667788998877665544332211C"
-        # self.fakeData = "A00112233A44556566A66766767A66554433A22112233A44556677A44556566A66766767A66554433A22112233A44556677A44556566A66766767A66554433A22112233A44556677A07080809A09080807A07080809D"
-        self.fakeData = "A00A11A22A33A44A55A65A66A66A76A67A67A66A55A44A33A22A11A22A33A44A55A66A77A44A55A65A66A66A76A67A67A66A55A44A33A22A11A22A33A44A55A66A77A44A55A65A66A66A76A67A67A66A55A44A33A22A11A22A33A44A55A66A77A07A08A08A09A09A08A08A07A07A08A08A09D"
+        self.fakeData = "A00112233A44556566A66766767A66554433A22112233A44556677A44556566A66766767A66554433A22112233A44556677A44556566A66766767A66554433A22112233A44556677A07080809A09080807A07080809D"
         time.sleep(0.1)
     
     def __xq_cmd(self):  
@@ -1150,72 +1145,44 @@ class __Tensile_Tester_Application(ttk.Frame):
                 self.data_count += 1
             count += 1
 
-            print("filter count:" , self.filter_count)
-            if self.filter_count < MOVING_AVG_NUM:
-                # print("waiting for enough data to be averaged")
-                if strainFlag == False:
-                    strainFlag = True
-                    self.rawStress.append(new_dataIn)   # raw stress data
-                    print("rawStress:",self.rawStress)
-                elif strainFlag == True:               
-                    strainFlag = False
-                    self.rawStrain.append(new_dataIn)
-                    print("rawStrain:",self.rawStrain)
-            else:
-                # Append decoded data into array
-                ########  FILTER STRESS ##########    
-                if strainFlag == False:
-                    strainFlag = True
-                    self.rawStress.append(new_dataIn)   # raw stress data
-                    print("rawStress:",self.rawStress)     
-                    avgStress = (self.rawStress[self.filter_count-3] + 
-                                 self.rawStress[self.filter_count-2] + 
-                                 self.rawStress[self.filter_count-1])/MOVING_AVG_NUM      
-                    fine_stress = avgStress*V_LSB_MV*LVDT_NEWTON_PER_MV     # force
-                    if fine_stress > self.ultimateSt:
-                        self.ultimateSt = fine_stress
-                    elif fine_stress < (self.ultimateSt * 0.05):     # 5% of ultimate Strength to determine breaks
-                        # print("Ultimate Strength is: ", self.ultimateSt)
-                        self.segUltSt.set(self.ultimateSt)
-                        print("stress is:", fine_stress,"ultStress is:", self.ultimateSt)
-                        return 0
-                    force = round(fine_stress,2)
-                    self.__update_force(force)
-                    fine_stress = fine_stress * self.inv_area     # stress
-                    self.stress.append(fine_stress)
-                    if fine_stress>self.ylim:
-                        self.ylim = fine_stress
-                        self.axTens.set_ylim(0, 1.2*self.ylim)
+            # Append decoded data into array
+            if strainFlag == False:
+                strainFlag = True
+                new_dataIn = new_dataIn*V_LSB_MV*LVDT_NEWTON_PER_MV     # force
+
+                if new_dataIn > self.ultimateSt:
+                    self.ultimateSt = new_dataIn
+                elif new_dataIn < (self.ultimateSt * 0.05):     # 5% of ultimate Strength to determine breaks
+                    print("Ultimate Strength is: ", self.ultimateSt)
+                    self.segUltSt.set(self.ultimateSt)
+                    return 0
+                # print("appended stress: ", new_dataIn)
+                force = round(new_dataIn,2)
+                self.__update_force(force)
+                new_dataIn = new_dataIn * self.inv_area     # stress
+                self.stress.append(new_dataIn)
+                if new_dataIn>self.ylim:
+                    self.ylim = new_dataIn
+                    self.axTens.set_ylim(0, 1.2*self.ylim)
 
 
-                ########  FILTER STRAIN ########## 
-                elif strainFlag == True:               
-                    strainFlag = False
-                    self.rawStrain.append(new_dataIn)
-                    print("rawStrain:", self.rawStrain)
-                    print("Filter count:",self.filter_count)
-                    avgStrain = (self.rawStrain[self.filter_count-3] + 
-                                 self.rawStrain[self.filter_count-2] + 
-                                 self.rawStrain[self.filter_count-1])/MOVING_AVG_NUM 
-                    # self.__update_pos(new_dataIn)
-                    # print("inv_length: ",self.inv_length)
-                    fine_strain = avgStrain * MM_PER_COUNT * self.inv_length
-                    # print("delL: ",new_dataIn * MM_PER_COUNT)
-                    self.strain.append(fine_strain)
-                    # new_dataIn = round(new_dataIn,2)
-                    if fine_strain>self.xlim:      
-                        print("set x axis during get data, xlim={}, new_dataIn={}".format(self.xlim,new_dataIn))              
-                        self.xlim = fine_strain
-                        self.axTens.set_xlim(0, 1.2*self.xlim)
-                    self.line.set_data(self.strain, self.stress)
-                    self.testCanvas.draw()
-                    self.master.update()
-
-
-                
-
-
+            elif strainFlag == True:
+                strainFlag = False
+                # self.__update_pos(new_dataIn)
+                # print("inv_length: ",self.inv_length)
+                new_dataIn = new_dataIn * MM_PER_COUNT * self.inv_length
+                # print("delL: ",new_dataIn * MM_PER_COUNT)
+                self.strain.append(new_dataIn)
+                # new_dataIn = round(new_dataIn,2)
+                if new_dataIn>self.xlim:      
+                    print("set x axis during get data, xlim={}, new_dataIn={}".format(self.xlim,new_dataIn))              
+                    self.xlim = new_dataIn
+                    self.axTens.set_xlim(0, 1.2*self.xlim)
+                self.line.set_data(self.strain, self.stress)
+                self.testCanvas.draw()
+                self.master.update()
             
+
             # stop updating diagram if user pressed stop button
             if self.stop_pressed:
                 self.__data_concat()
