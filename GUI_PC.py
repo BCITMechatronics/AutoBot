@@ -59,28 +59,30 @@ COM_PORT = "COM8"
  
 txtBoxHeight = 30
 btnHeight = 22
-TEST_WITH_TMS = False
+TEST_WITH_TMS = True
 
 ## MECH PROPERTY
 NM_PER_COUNT = 0.093612752          # lead screw moves per 1 encoder count
 MM_PER_COUNT = 0.000331925          # lead screw moves per 1 encoder count
 COUNT_PER_NM = 10.68230524          # count accumulation per 1 nm movement
 MAX_COUNT = 6719170                 # default max count (not accurate, only used when user not want to calibrate)
-ADC_BIT = 16                        # ADC Bit size for differential mode
+ADC_BIT = 12                        # ADC Bit size for differential mode
 ADC_N_MAX = 2**ADC_BIT              # number of steps for ADC
 
 LOAD_CELL_CAP = 4900                # load cell capacity in kN
 
 if TEST_WITH_TMS:
-    V_LSB_MV = 3300/ADC_N_MAX       # V_LSB in mV
-    LVDT_NEWTON_PER_MV = 2.03412143    # LVDT output voltage per Newton
+    V_LSB_MV = 2820/ADC_N_MAX       # V_LSB in mV
+    GRAVITY = 9.80665               # g in N/kg
+    LDVT_CONST = 0.2                  # in kg/mV
+    LVDT_NEWTON_PER_MV = GRAVITY * LDVT_CONST    # in N/mV
     CRITICAL_FORCE = 0.9*LOAD_CELL_CAP  # 90% of maximum capacity of load cell
     HIGH_FORCE = 0.6*LOAD_CELL_CAP    # 60% of maximum capacity of load cell
     READ_SIZE = 3
     NUM_DATA_POINT =  1
 else:
     V_LSB_MV = 3300000/ADC_N_MAX    # V_LSB in mV
-    LVDT_NEWTON_PER_MV = 2.03412143    # LVDT output voltage per Newton
+    LVDT_NEWTON_PER_MV = 0.01580558974    # LVDT output voltage per Newton
     CRITICAL_FORCE = 0.1*LOAD_CELL_CAP  # 90% of maximum capacity of load cell
     HIGH_FORCE = 0.05*LOAD_CELL_CAP    # 60% of maximum capacity of load cell
     READ_SIZE = 4
@@ -527,9 +529,9 @@ class __Tensile_Tester_Application(ttk.Frame):
                     amountused=0,
                     amounttotal=4900,
                     stripethickness = 3,
-                    textright="kN",
+                    textright="N",
                     metertype="semi",
-                    subtext="max: 4900kN",
+                    subtext="max: 4900N",
                     interactive=False,
                     padding=20,
                     bootstyle='dark'
@@ -733,9 +735,10 @@ class __Tensile_Tester_Application(ttk.Frame):
             # ser.reset_output_buffer()
             ser.write("MOVE,UP\r".encode())
             ser.write("START\r".encode())
-            time.sleep(0.05)
+            time.sleep(0.5)
+            # messagebox.showinfo("Information","Starting Test")
             while(ser.in_waiting):
-                time.sleep(0.1)
+                time.sleep(0.01)
                 if not self.__xq_cmd():
                     print("send STOP")
                     break    
@@ -760,7 +763,7 @@ class __Tensile_Tester_Application(ttk.Frame):
     def __update_dir(self):
         dirVal = self.dirVar.get()
         if (dirVal == 1):
-            messagebox.showinfo("Information", "Moving down")
+            messagebox.showinfo("Information", "Moving up")
             if TEST_WITH_TMS:
                 ser.write(("MOVE,UP\r").encode())
         elif (dirVal == 2):
@@ -1161,6 +1164,7 @@ class __Tensile_Tester_Application(ttk.Frame):
                 if new_dataIn>self.ylim:
                     self.ylim = new_dataIn
                     self.axTens.set_ylim(0, 1.2*self.ylim)
+
 
             elif strainFlag == True:
                 strainFlag = False
