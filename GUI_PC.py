@@ -59,7 +59,7 @@ COM_PORT = "COM8"
  
 txtBoxHeight = 30
 btnHeight = 22
-TEST_WITH_TMS = False
+TEST_WITH_TMS = True
 
 ## MECH PROPERTY
 NM_PER_COUNT = 0.093612752          # lead screw moves per 1 encoder count
@@ -70,7 +70,7 @@ ADC_BIT = 12                        # ADC Bit size for differential mode
 ADC_N_MAX = 2**ADC_BIT              # number of steps for ADC
 
 LOAD_CELL_CAP = 4900                # load cell capacity in kN
-MOVING_AVG_NUM = 3                  # num of points to moving avg
+MOVING_AVG_NUM = 3                  # (desired) num of points to moving avg
 
 if TEST_WITH_TMS:
     V_LSB_MV = 2820/ADC_N_MAX       # V_LSB in mV
@@ -742,8 +742,9 @@ class __Tensile_Tester_Application(ttk.Frame):
             time.sleep(0.5)
             # messagebox.showinfo("Information","Starting Test")
             while(ser.in_waiting):
-                time.sleep(0.01)
+                # time.sleep(0.01)
                 if not self.__xq_cmd():
+                    print("xq_cmd return 0")
                     print("send STOP")
                     break    
             ser.write(("STOP\r").encode())
@@ -1133,6 +1134,8 @@ class __Tensile_Tester_Application(ttk.Frame):
         new_dataIn = 0
         data_size = NUM_DATA_POINT * 2
         count = 0
+        sumStrain = 0
+        sumStress = 0
         # print("entered Cmd_Byte == A")
         strainFlag = False   # To indicate incoming strain or stress data
         # self.axTens.set_xlim(0, 1)
@@ -1143,7 +1146,7 @@ class __Tensile_Tester_Application(ttk.Frame):
                 new_dataIn = (ser.read(READ_SIZE))    # Obtain serial data from TMS
                 # print("Reading byte: ", new_dataIn)
                 new_dataIn = int.from_bytes(new_dataIn,byteorder='little')
-                print("Converting int: ", new_dataIn)
+                # print("Converting int: ", new_dataIn)
             else:
                 new_dataIn = int(self.fakeData[self.data_count])
                 # print("Converting int: ", new_dataIn)
@@ -1156,32 +1159,36 @@ class __Tensile_Tester_Application(ttk.Frame):
                 if strainFlag == False:
                     strainFlag = True
                     self.rawStress.append(new_dataIn)   # raw stress data
-                    print("rawStress:",self.rawStress)
+                    # print("pre append rawStress:",self.rawStress)
                 elif strainFlag == True:               
                     strainFlag = False
                     self.rawStrain.append(new_dataIn)
-                    print("rawStrain:",self.rawStrain)
+                    # print("pre append rawStrain:",self.rawStrain)
+                    self.filter_count += 1
             else:
                 # Append decoded data into array
                 ########  FILTER STRESS ##########    
                 if strainFlag == False:
                     strainFlag = True
                     self.rawStress.append(new_dataIn)   # raw stress data
-                    print("rawStress:",self.rawStress)     
-                    avgStress = (self.rawStress[self.filter_count-3] + 
-                                 self.rawStress[self.filter_count-2] + 
-                                 self.rawStress[self.filter_count-1])/MOVING_AVG_NUM      
-                    fine_stress = avgStress*V_LSB_MV*LVDT_NEWTON_PER_MV     # force
+                    # print("rawStress:",self.rawStress)     
+                    for k in range(MOVING_AVG_NUM):
+                        sumStress += self.rawStress[self.filter_count-k]
+                    avgStress = sumStress/MOVING_AVG_NUM      
+                    fine_force = avgStress*V_LSB_MV*LVDT_NEWTON_PER_MV     # force 
+                    self.__update_force(round(fine_force,2))
+                    fine_stress = fine_force * self.inv_area     # stress
+                    print("fine stress is:", fine_stress,"ult stress is:", self.ultimateSt)
                     if fine_stress > self.ultimateSt:
                         self.ultimateSt = fine_stress
-                    elif fine_stress < (self.ultimateSt * 0.05):     # 5% of ultimate Strength to determine breaks
-                        # print("Ultimate Strength is: ", self.ultimateSt)
+                        # print("update Ultimate Strength is: ", self.ultimateSt)
+                    elif fine_stress < (self.ultimateSt * 0.1):     # 5% of ultimate Strength to determine breaks
+                        print("Ultimate Strength is: ", self.ultimateSt)
+                        print("fine stress: ", self.stress)
+                        print("fine strain: ",self.strain)
                         self.segUltSt.set(self.ultimateSt)
-                        print("stress is:", fine_stress,"ultStress is:", self.ultimateSt)
                         return 0
-                    force = round(fine_stress,2)
-                    self.__update_force(force)
-                    fine_stress = fine_stress * self.inv_area     # stress
+
                     self.stress.append(fine_stress)
                     if fine_stress>self.ylim:
                         self.ylim = fine_stress
@@ -1192,11 +1199,10 @@ class __Tensile_Tester_Application(ttk.Frame):
                 elif strainFlag == True:               
                     strainFlag = False
                     self.rawStrain.append(new_dataIn)
-                    print("rawStrain:", self.rawStrain)
-                    print("Filter count:",self.filter_count)
-                    avgStrain = (self.rawStrain[self.filter_count-3] + 
-                                 self.rawStrain[self.filter_count-2] + 
-                                 self.rawStrain[self.filter_count-1])/MOVING_AVG_NUM 
+                    # print("rawStrain:", self.rawStrain)
+                    for j in range(MOVING_AVG_NUM):
+                        sumStrain += self.rawStrain[self.filter_count-j]
+                    avgStrain = sumStrain/MOVING_AVG_NUM 
                     # self.__update_pos(new_dataIn)
                     # print("inv_length: ",self.inv_length)
                     fine_strain = avgStrain * MM_PER_COUNT * self.inv_length
@@ -1204,24 +1210,24 @@ class __Tensile_Tester_Application(ttk.Frame):
                     self.strain.append(fine_strain)
                     # new_dataIn = round(new_dataIn,2)
                     if fine_strain>self.xlim:      
-                        print("set x axis during get data, xlim={}, new_dataIn={}".format(self.xlim,new_dataIn))              
+                        # print("set x axis during get data, xlim={}, new_dataIn={}".format(self.xlim,new_dataIn))              
                         self.xlim = fine_strain
                         self.axTens.set_xlim(0, 1.2*self.xlim)
+                    
+                    self.filter_count += 1
                     self.line.set_data(self.strain, self.stress)
                     self.testCanvas.draw()
-                    self.master.update()
+                    self.master.update()           
+                    
+                     # stop updating diagram if user pressed stop button
+                    if self.stop_pressed:
+                        self.__data_concat()
+                        if TEST_WITH_TMS:
+                            print("stop pressed")
+                            return 0
 
 
                 
-
-
-            
-            # stop updating diagram if user pressed stop button
-            if self.stop_pressed:
-                self.__data_concat()
-                if TEST_WITH_TMS:
-                    print("stop pressed")
-                    return 0
 
         return 1
           
