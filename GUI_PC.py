@@ -69,13 +69,18 @@ MAX_COUNT = 6719170                 # default max count (not accurate, only used
 ADC_BIT = 12                        # ADC Bit size for differential mode
 ADC_N_MAX = 2**ADC_BIT              # number of steps for ADC
 
-LOAD_CELL_CAP = 4900                # load cell capacity in kN
+LOAD_CELL_100KG = False
+if LOAD_CELL_100KG:
+    LOAD_CELL_CAP = 500                # load cell capacity in kg
+    LDVT_CONST = 0.2                  # in kg/mV
+else:
+    LOAD_CELL_CAP = 50                 # load cell cap in kg
+    LDVT_CONST = 0.023                  # in kg/mV
 MOVING_AVG_NUM = 3                  # (desired) num of points to moving avg
 
 if TEST_WITH_TMS:
     V_LSB_MV = 2820/ADC_N_MAX       # V_LSB in mV
     GRAVITY = 9.80665               # g in N/kg
-    LDVT_CONST = 0.2                  # in kg/mV
     LVDT_NEWTON_PER_MV = GRAVITY * LDVT_CONST    # in N/mV
     CRITICAL_FORCE = 0.9*LOAD_CELL_CAP  # 90% of maximum capacity of load cell
     HIGH_FORCE = 0.6*LOAD_CELL_CAP    # 60% of maximum capacity of load cell
@@ -532,7 +537,7 @@ class __Tensile_Tester_Application(ttk.Frame):
                     stripethickness = 3,
                     textright="N",
                     metertype="semi",
-                    subtext="max: 4900N",
+                    subtext='max cap: 490N',
                     interactive=False,
                     padding=20,
                     bootstyle='dark'
@@ -1146,7 +1151,7 @@ class __Tensile_Tester_Application(ttk.Frame):
                 new_dataIn = (ser.read(READ_SIZE))    # Obtain serial data from TMS
                 # print("Reading byte: ", new_dataIn)
                 new_dataIn = int.from_bytes(new_dataIn,byteorder='little')
-                # print("Converting int: ", new_dataIn)
+                print("Converting int: ", new_dataIn)
             else:
                 new_dataIn = int(self.fakeData[self.data_count])
                 # print("Converting int: ", new_dataIn)
@@ -1159,7 +1164,7 @@ class __Tensile_Tester_Application(ttk.Frame):
                 if strainFlag == False:
                     strainFlag = True
                     self.rawStress.append(new_dataIn)   # raw stress data
-                    # print("pre append rawStress:",self.rawStress)
+                    print("pre append rawStress:",self.rawStress)
                 elif strainFlag == True:               
                     strainFlag = False
                     self.rawStrain.append(new_dataIn)

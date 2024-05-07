@@ -52,7 +52,7 @@ txtBoxHeight = 30
 btnHeight = 22
 NUM_DATA_POINT =  12
 READ_SIZE = 4
-TEST_WITH_TMS = False
+TEST_WITH_TMS = True
 
 ## MECH PROPERTY
 NM_PER_COUNT = 0.0936127527656      # lead screw moves per 1 encoder count
